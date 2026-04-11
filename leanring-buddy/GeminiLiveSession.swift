@@ -40,6 +40,13 @@ final class GeminiLiveSession: NSObject, ObservableObject {
     /// Audio power level from the mic, 0–1. Drives the waveform UI.
     @Published private(set) var currentAudioPowerLevel: CGFloat = 0
 
+    /// Set by the Durable Object via an `atayiServerEvent` frame when it
+    /// terminates the session for a subscription reason (credits exhausted,
+    /// daily cap reached, device blocked, etc.). CompanionManager observes
+    /// this and surfaces a user-friendly error in the overlay.
+    @Published var atayiBlockedReason: String? = nil
+    @Published var atayiBlockedMessage: String? = nil
+
     // MARK: - Callbacks
 
     /// Called to capture all screens. CompanionManager provides this.
@@ -114,55 +121,51 @@ final class GeminiLiveSession: NSObject, ObservableObject {
 
     // MARK: - Public interface
 
-    /// Fetches the Gemini API key via the Worker proxy, opens a WebSocket to
-    /// the Gemini Live API, and starts streaming microphone audio.
-    func connect(tokenProxyURL: String) async {
+    /// Opens a WebSocket to the Cloudflare Worker Durable Object that proxies
+    /// the Gemini Live session. The worker holds the Gemini API key server-side
+    /// and relays frames bidirectionally while counting tokens for billing.
+    ///
+    /// The client never sees the Gemini API key — it only knows about the
+    /// proxy URL and the short-lived `session_token` issued by
+    /// `POST /api/session/preflight`.
+    func connect(proxiedWebSocketURL: String, sessionToken: String) async {
         guard sessionState == .disconnected else {
             print("⚠️ Gemini Live: connect() called but sessionState=\(sessionState) — ignoring")
             return
         }
+        // Clear any blocked reason from a previous session
+        atayiBlockedReason = nil
+        atayiBlockedMessage = nil
         sessionState = .connecting
-        print("🟢 Gemini Live [1/6]: sessionState → connecting")
+        print("🟢 Gemini Live [1/4]: sessionState → connecting (via worker proxy)")
 
-        // Derive the worker base URL so we can call /chat if needed later.
-        let tokenPathSuffix = "/gemini-live-token"
-        if tokenProxyURL.hasSuffix(tokenPathSuffix) {
-            workerBaseURL = String(tokenProxyURL.dropLast(tokenPathSuffix.count))
+        // Store the worker base URL for any ancillary calls (admin endpoints, etc.)
+        if let parsedURL = URL(string: proxiedWebSocketURL),
+           let host = parsedURL.host {
+            let scheme = parsedURL.scheme == "wss" ? "https" : "http"
+            workerBaseURL = "\(scheme)://\(host)"
         }
 
-        print("🟢 Gemini Live [2/6]: fetching API key from \(tokenProxyURL)")
-        guard let geminiAPIKey = await fetchGeminiAPIKey(from: tokenProxyURL) else {
-            print("❌ Gemini Live: failed to fetch API key — aborting connect()")
-            sessionState = .disconnected
-            return
-        }
-        print("🟢 Gemini Live [3/6]: API key fetched — prefix=\(String(geminiAPIKey.prefix(8)))…")
-
-        // Gemini Live WebSocket — v1alpha, key in both query param and header for max compatibility.
-        // ?key= is the standard Google API auth for WebSocket upgrades.
-        let geminiLiveWSURLString =
-            "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=\(geminiAPIKey)"
-
-        guard let geminiLiveWSURL = URL(string: geminiLiveWSURLString) else {
-            print("❌ Gemini Live: invalid WebSocket URL — aborting")
+        guard let wsURL = URL(string: proxiedWebSocketURL) else {
+            print("❌ Gemini Live: invalid proxied WebSocket URL — aborting")
             sessionState = .disconnected
             return
         }
 
-        print("🟢 Gemini Live [4/6]: opening WebSocket to v1alpha BidiGenerateContent")
+        print("🟢 Gemini Live [2/4]: opening WebSocket to worker proxy \(wsURL.host ?? "?")")
 
-        // Both ?key= in URL and x-goog-api-key header to cover both auth methods.
-        var webSocketRequest = URLRequest(url: geminiLiveWSURL)
-        webSocketRequest.setValue(geminiAPIKey, forHTTPHeaderField: "x-goog-api-key")
+        var webSocketRequest = URLRequest(url: wsURL)
+        webSocketRequest.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
 
         let task = urlSession.webSocketTask(with: webSocketRequest)
         self.webSocketTask = task
         task.resume()
-        print("🟢 Gemini Live [5/6]: WebSocket task resumed — handshake in progress")
+        print("🟢 Gemini Live [3/4]: WebSocket task resumed — handshake in progress")
 
         // Setup message must be the very first message sent after connect.
+        // The Durable Object forwards this transparently to Gemini.
         sendSetupMessage()
-        print("🟢 Gemini Live [6/6]: receive loop started — waiting for setupComplete")
+        print("🟢 Gemini Live [4/4]: receive loop started — waiting for setupComplete")
         receiveNextWebSocketMessage()
     }
 
@@ -177,6 +180,10 @@ final class GeminiLiveSession: NSObject, ObservableObject {
         resetPerTurnState()
         currentAudioPowerLevel = 0
         sessionState = .disconnected
+        // We deliberately do NOT reset `atayiBlockedReason` / `atayiBlockedMessage`
+        // here — the CompanionManager needs to observe the value AFTER disconnect
+        // to surface the blocked reason to the user. It's cleared when a new
+        // session is opened (see connect()).
     }
 
     /// True when the session WebSocket is open.
@@ -308,27 +315,6 @@ final class GeminiLiveSession: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - Private: API key fetch
-
-    private func fetchGeminiAPIKey(from proxyURL: String) async -> String? {
-        guard let requestURL = URL(string: proxyURL) else { return nil }
-        var httpRequest = URLRequest(url: requestURL)
-        httpRequest.httpMethod = "POST"
-        do {
-            let (responseData, httpResponse) = try await URLSession.shared.data(for: httpRequest)
-            guard let castedResponse = httpResponse as? HTTPURLResponse,
-                  (200...299).contains(castedResponse.statusCode) else {
-                print("❌ Gemini Live: key proxy returned non-200")
-                return nil
-            }
-            let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any]
-            return json?["key"] as? String
-        } catch {
-            print("❌ Gemini Live: key fetch error: \(error)")
-            return nil
-        }
-    }
-
     // MARK: - Private: Session setup
 
     private func sendSetupMessage() {
@@ -434,6 +420,20 @@ final class GeminiLiveSession: NSObject, ObservableObject {
         }
 
         print("📋 Gemini Live: parsed JSON keys=\(json.keys.sorted())")
+
+        // atayiServerEvent: synthetic messages from the Cloudflare Worker
+        // Durable Object (not from Gemini itself). Used to signal out-of-band
+        // events like "credits_exhausted" or "daily_cap_reached" so the client
+        // can show a user-friendly message before the socket closes.
+        if let atayiEvent = json["atayiServerEvent"] as? [String: Any] {
+            let eventType = atayiEvent["type"] as? String ?? "unknown"
+            let reason = atayiEvent["reason"] as? String ?? "unknown"
+            let message = atayiEvent["message"] as? String ?? "Session terminated by server"
+            print("🚫 Atayi server event [\(eventType)] reason=\(reason): \(message)")
+            atayiBlockedReason = reason
+            atayiBlockedMessage = message
+            return
+        }
 
         // Setup complete → mic can start
         if json["setupComplete"] != nil {

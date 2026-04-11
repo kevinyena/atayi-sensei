@@ -44,9 +44,17 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
 
         menuBarPanelManager = MenuBarPanelManager(companionManager: companionManager)
         companionManager.start()
+
+        // Hydrate the license state from Keychain cache + /api/license/status
+        // so the panel can immediately reflect the user's plan/credits.
+        Task {
+            await LicenseManager.shared.hydrateFromCache()
+        }
+
         // Auto-open the panel if the user still needs to do something:
-        // either they haven't onboarded yet, or permissions were revoked.
-        if !companionManager.hasCompletedOnboarding || !companionManager.allPermissionsGranted {
+        // haven't onboarded, permissions revoked, or no active license.
+        let needsActivation = LicenseManager.shared.cachedDeviceToken == nil
+        if !companionManager.hasCompletedOnboarding || !companionManager.allPermissionsGranted || needsActivation {
             menuBarPanelManager?.showPanelOnLaunch()
         }
         registerAsLoginItemIfNeeded()

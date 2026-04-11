@@ -322,20 +322,22 @@ final class CompanionManager: ObservableObject {
     // Response text is now displayed inline on the cursor overlay via
     // streamingResponseText, so no separate response overlay manager is needed.
 
-    /// Base URL for the Cloudflare Worker proxy. All API requests route
-    /// through this so keys never ship in the app binary.
-    private static let workerBaseURL = "https://clicky-proxy.kevinyena9.workers.dev"
-
-    /// URL of the Worker endpoint that returns the Gemini API key for Live sessions.
-    private static let geminiLiveTokenProxyURL = "\(workerBaseURL)/gemini-live-token"
-
     /// Manages the persistent Gemini Live WebSocket session. Single model that
     /// handles VAD, vision (screenshots), reasoning, and audio output natively.
+    /// The session is proxied through the Cloudflare Worker so the Gemini
+    /// API key never ships in this app binary.
     let geminiLiveSession = GeminiLiveSession()
+
+    /// Most recent license/preflight error, displayed in the panel and overlay
+    /// when a session fails to start (trial expired, credits exhausted, device
+    /// blocked, etc.). Set by `openRealtimeConversationSession()` when the
+    /// `LicenseManager.preflightSession()` call fails, cleared on success.
+    @Published var licenseErrorMessage: String? = nil
 
     private var shortcutTransitionCancellable: AnyCancellable?
     private var voiceStateCancellable: AnyCancellable?
     private var audioPowerCancellable: AnyCancellable?
+    private var blockedEventCancellable: AnyCancellable?
     private var accessibilityCheckTimer: Timer?
     /// Scheduled hide for transient cursor mode — cancelled if the user
     /// speaks again before the delay elapses.
@@ -419,6 +421,7 @@ final class CompanionManager: ObservableObject {
         bindAudioPowerLevel()
         bindShortcutTransitions()
         bindRealtimeSessionCallbacks()
+        bindBlockedEventObservation()
 
         // If the user already completed onboarding AND all permissions are
         // still granted, show the cursor overlay immediately. If permissions
@@ -528,6 +531,7 @@ final class CompanionManager: ObservableObject {
         shortcutTransitionCancellable?.cancel()
         voiceStateCancellable?.cancel()
         audioPowerCancellable?.cancel()
+        blockedEventCancellable?.cancel()
         accessibilityCheckTimer?.invalidate()
         accessibilityCheckTimer = nil
     }
@@ -649,6 +653,25 @@ final class CompanionManager: ObservableObject {
         }
     }
 
+    /// Observes blocked frames sent by the Cloudflare Worker Durable Object.
+    /// When the server terminates a session for a billing reason (credits
+    /// exhausted, daily cap reached, subscription inactive, device blocked),
+    /// the DO sends an `atayiServerEvent.blocked` frame. We mirror the reason
+    /// into `licenseErrorMessage` so the panel + overlay can display it,
+    /// then trigger a license status refresh so the UI reflects the new state.
+    private func bindBlockedEventObservation() {
+        blockedEventCancellable = geminiLiveSession.$atayiBlockedMessage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] blockedMessage in
+                guard let self, let blockedMessage, !blockedMessage.isEmpty else { return }
+                self.licenseErrorMessage = blockedMessage
+                // Re-query the server so the panel shows the fresh state
+                Task { @MainActor in
+                    await LicenseManager.shared.refreshStatus()
+                }
+            }
+    }
+
     private func bindAudioPowerLevel() {
         audioPowerCancellable = geminiLiveSession.$currentAudioPowerLevel
             .receive(on: DispatchQueue.main)
@@ -672,15 +695,27 @@ final class CompanionManager: ObservableObject {
                     // Auto-reconnect when the session closes unexpectedly (server timeout,
                     // network blip, etc.) so the user never has to re-press Ctrl+Option
                     // just to continue the conversation after Clicky finishes responding.
-                    // Only skipped when the user explicitly pressed Ctrl+Option to close.
-                    if !self.userInitiatedSessionDisconnect && self.isOverlayVisible {
+                    // Only skipped when the user explicitly pressed Ctrl+Option to close,
+                    // or when the server refused to reopen the session (subscription
+                    // expired, credits exhausted, device blocked).
+                    let wasBlockedByServer = self.geminiLiveSession.atayiBlockedReason != nil
+                    if !self.userInitiatedSessionDisconnect && self.isOverlayVisible && !wasBlockedByServer {
                         print("🔄 Gemini Live: session closed unexpectedly — auto-reconnecting in 0.5s")
                         Task {
                             try? await Task.sleep(nanoseconds: 500_000_000)
-                            self.geminiLiveSession.responseLanguage = self.selectedLanguage
-                            await self.geminiLiveSession.connect(
-                                tokenProxyURL: Self.geminiLiveTokenProxyURL
-                            )
+                            // Re-run preflight to get a fresh session token, since the
+                            // previous one was consumed and the DO is gone.
+                            let preflightResult = await LicenseManager.shared.preflightSession()
+                            if case .success(let preflightInfo) = preflightResult {
+                                self.geminiLiveSession.responseLanguage = self.selectedLanguage
+                                await self.geminiLiveSession.connect(
+                                    proxiedWebSocketURL: preflightInfo.wsURL,
+                                    sessionToken: preflightInfo.sessionToken,
+                                )
+                            } else if case .failure(let error) = preflightResult {
+                                print("❌ Auto-reconnect preflight failed: \(error.localizedDescription)")
+                                self.licenseErrorMessage = error.localizedDescription
+                            }
                         }
                     }
                     self.userInitiatedSessionDisconnect = false
@@ -743,6 +778,15 @@ final class CompanionManager: ObservableObject {
 
     /// Opens the Gemini Live session and shows the cursor overlay.
     /// Called on the first Ctrl+Option press.
+    ///
+    /// Before opening the WebSocket, we hit `POST /api/session/preflight` on
+    /// the Cloudflare Worker to verify that:
+    ///   - the user has an active license activated on this device
+    ///   - the subscription still has credits
+    ///   - the trial daily cap isn't reached
+    /// The worker responds with a `ws_url` pointing at the Durable Object that
+    /// proxies Gemini Live, plus a short-lived `session_token` used as auth.
+    /// The Gemini API key NEVER reaches this app.
     private func openRealtimeConversationSession() {
         // Cancel any pending transient hide so the overlay stays up
         transientHideTask?.cancel()
@@ -772,11 +816,29 @@ final class CompanionManager: ObservableObject {
         ClickyAnalytics.trackPushToTalkStarted()
 
         Task {
-            // Set language before connecting so the setup message uses the correct system prompt.
-            geminiLiveSession.responseLanguage = selectedLanguage
-            await geminiLiveSession.connect(
-                tokenProxyURL: Self.geminiLiveTokenProxyURL
-            )
+            // 1. Preflight: verify license + subscription + credits + daily cap.
+            let preflightResult = await LicenseManager.shared.preflightSession()
+            switch preflightResult {
+            case .failure(let error):
+                print("❌ Session preflight failed: \(error.localizedDescription)")
+                licenseErrorMessage = error.localizedDescription
+                // Refresh status so the panel UI reflects the latest server state
+                await LicenseManager.shared.refreshStatus()
+                return
+            case .success(let preflightInfo):
+                print("🟢 Preflight OK — credits remaining: \(preflightInfo.creditsRemaining)")
+                licenseErrorMessage = nil
+
+                // 2. Set language before connecting so the setup message uses the correct prompt.
+                geminiLiveSession.responseLanguage = selectedLanguage
+
+                // 3. Open the WebSocket to the worker Durable Object proxy.
+                //    The session_token is a short-lived HS256 JWT that the DO verifies.
+                await geminiLiveSession.connect(
+                    proxiedWebSocketURL: preflightInfo.wsURL,
+                    sessionToken: preflightInfo.sessionToken,
+                )
+            }
         }
     }
 

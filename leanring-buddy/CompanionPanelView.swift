@@ -12,7 +12,25 @@ import SwiftUI
 
 struct CompanionPanelView: View {
     @ObservedObject var companionManager: CompanionManager
+    @ObservedObject private var licenseManager = LicenseManager.shared
     @State private var emailInput: String = ""
+
+    private var shouldShowLicenseActivation: Bool {
+        // Show the activation gate when there's no cached device_token.
+        // The panel renders the activation UI full-bleed in that case,
+        // skipping permissions/onboarding UI since they don't matter until
+        // the license is valid.
+        switch licenseManager.currentState {
+        case .notActivated, .expired, .blocked:
+            return true
+        case .unknown:
+            // Keychain not yet read — don't flash the activation UI, show a
+            // neutral header only so the panel doesn't jump around.
+            return licenseManager.cachedDeviceToken == nil
+        case .activating, .active, .error:
+            return false
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -21,6 +39,26 @@ struct CompanionPanelView: View {
                 .background(DS.Colors.borderSubtle)
                 .padding(.horizontal, 16)
 
+            if shouldShowLicenseActivation {
+                LicenseActivationView(companionManager: companionManager)
+                Spacer(minLength: 0)
+                Divider()
+                    .background(DS.Colors.borderSubtle)
+                    .padding(.horizontal, 16)
+                footerSection
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+            } else {
+                regularBody
+            }
+        }
+        .frame(width: 320)
+        .background(panelBackground)
+    }
+
+    @ViewBuilder
+    private var regularBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
             permissionsCopySection
                 .padding(.top, 16)
                 .padding(.horizontal, 16)
@@ -62,6 +100,13 @@ struct CompanionPanelView: View {
                 Spacer()
                     .frame(height: 16)
 
+                // Subscription status chip — plan / credits / daily cap
+                SubscriptionStatusView(companionManager: companionManager)
+                    .padding(.horizontal, 16)
+
+                Spacer()
+                    .frame(height: 12)
+
                 dmFarzaButton
                     .padding(.horizontal, 16)
             }
@@ -77,8 +122,6 @@ struct CompanionPanelView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
         }
-        .frame(width: 320)
-        .background(panelBackground)
     }
 
     // MARK: - Header
