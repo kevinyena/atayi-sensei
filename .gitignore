@@ -4,5 +4,6 @@ worker/.dev.vars
 *.xcuserstate
 build/
 releases/
+Landing/downloads/*.dmg
 .claude/
 coding-plans/

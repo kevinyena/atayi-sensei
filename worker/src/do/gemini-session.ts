@@ -99,9 +99,16 @@ export class GeminiSessionDO extends DurableObject<Env> {
 
   private async openUpstreamWebSocket(): Promise<void> {
     const geminiKey = this.env.GEMINI_API_KEY;
-    const upstreamURL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${geminiKey}`;
 
-    // Cloudflare Workers support opening outbound WebSockets via fetch() with Upgrade.
+    // Cloudflare Workers outbound WebSockets require `https://` in the fetch()
+    // URL (not `wss://`) plus the `Upgrade: websocket` header. The response
+    // will have status 101 and a `.webSocket` property on success.
+    //
+    // See: https://developers.cloudflare.com/workers/runtime-apis/websockets/#connect-to-a-websocket-server
+    const upstreamURL = `https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${geminiKey}`;
+
+    console.log(`[GeminiSessionDO] opening upstream to ${upstreamURL.replace(geminiKey, "<redacted>")}`);
+
     const response = await fetch(upstreamURL, {
       headers: {
         Upgrade: "websocket",
@@ -110,11 +117,13 @@ export class GeminiSessionDO extends DurableObject<Env> {
     });
 
     if (response.status !== 101 || !response.webSocket) {
-      throw new Error(`Upstream handshake failed: ${response.status}`);
+      const errorBody = await response.text().catch(() => "<no body>");
+      throw new Error(`Upstream handshake failed: status=${response.status} body=${errorBody.slice(0, 500)}`);
     }
 
     this.upstreamWebSocket = response.webSocket;
     this.upstreamWebSocket.accept();
+    console.log(`[GeminiSessionDO] upstream WebSocket accepted`);
   }
 
   private wireClientHandlers(): void {
