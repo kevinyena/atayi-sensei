@@ -25,7 +25,7 @@ import Foundation
 @MainActor
 final class GeminiLiveSession: NSObject, ObservableObject {
 
-    // MARK: - Session state (matches OpenAIRealtimeSession interface for CompanionManager)
+    // MARK: - Session state
 
     enum SessionState {
         case disconnected
