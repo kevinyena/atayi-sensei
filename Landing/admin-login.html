@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin login — Atayi Sensei</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/png" href="MYE4a.jpg" />
+</head>
+<body>
+  <nav class="atayi-nav">
+    <a class="logo" href="/">
+      <img src="MYE4a.jpg" alt="Atayi Sensei" />
+      <span>Atayi Sensei Admin</span>
+    </a>
+  </nav>
+
+  <div class="atayi-card">
+    <h1>Admin login</h1>
+    <p class="subtitle">Enter the admin password to access the dashboard.</p>
+
+    <form id="loginForm">
+      <label for="passwordInput">Password</label>
+      <input type="password" id="passwordInput" required autocomplete="current-password" />
+      <div style="height: 16px;"></div>
+      <button type="submit" class="atayi-btn" id="submitButton">Sign in</button>
+    </form>
+
+    <div id="errorBanner" class="atayi-error" style="display:none;"></div>
+  </div>
+
+  <script type="module">
+    import { api } from "/js/api.js";
+    import { injectSharedStyles } from "/js/shared-styles.js";
+
+    injectSharedStyles();
+
+    // Redirect to dashboard if already logged in
+    const existingAdminToken = localStorage.getItem("atayi_admin_token");
+    if (existingAdminToken) {
+      window.location.replace("/admin.html");
+    }
+
+    const loginForm = document.getElementById("loginForm");
+    const passwordInput = document.getElementById("passwordInput");
+    const submitButton = document.getElementById("submitButton");
+    const errorBanner = document.getElementById("errorBanner");
+
+    loginForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorBanner.style.display = "none";
+      submitButton.disabled = true;
+      submitButton.innerHTML = '<span class="atayi-spinner"></span>&nbsp;Signing in…';
+
+      try {
+        const response = await api.adminLogin(passwordInput.value);
+        if (response.ok && response.body.admin_token) {
+          localStorage.setItem("atayi_admin_token", response.body.admin_token);
+          window.location.href = "/admin.html";
+          return;
+        }
+        throw new Error(response.body.message || "Invalid credentials");
+      } catch (error) {
+        errorBanner.textContent = error.message;
+        errorBanner.style.display = "block";
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = "Sign in";
+      }
+    });
+  </script>
+</body>
+</html>

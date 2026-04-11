@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment successful — Atayi Sensei</title>
+  <link rel="icon" type="image/png" href="MYE4a.jpg" />
+</head>
+<body>
+  <nav class="atayi-nav">
+    <a class="logo" href="/">
+      <img src="MYE4a.jpg" alt="Atayi Sensei" />
+      <span>Atayi Sensei</span>
+    </a>
+  </nav>
+
+  <div class="atayi-card" id="loadingCard">
+    <h1>Loading your license…</h1>
+    <p class="subtitle">We're retrieving your license code from Stripe. This takes a few seconds.</p>
+    <div style="text-align:center; padding: 20px 0;">
+      <span class="atayi-spinner"></span>
+    </div>
+  </div>
+
+  <div class="atayi-card" id="successCard" style="display:none;">
+    <span class="atayi-plan-chip" id="planChip">—</span>
+    <h1>🎉 Welcome to Atayi Sensei</h1>
+    <p class="subtitle">
+      Your subscription is active. Copy your license code below and paste it in the app after installing.
+      <strong>This is the only place your license code will be shown.</strong>
+    </p>
+
+    <div class="atayi-license-code" id="licenseCodeDisplay">—</div>
+
+    <button class="atayi-btn" id="copyCodeButton">Copy code</button>
+
+    <div class="atayi-warning">
+      ⚠️ Save this code in your password manager right now. You won't see it again after leaving this page.
+      If you lose it, contact <a href="mailto:support@atayisensei.io" style="color:inherit; text-decoration:underline;">support</a> with your email.
+    </div>
+
+    <div style="height: 12px;"></div>
+
+    <a class="atayi-btn secondary" href="/" id="downloadLink">Download Atayi Sensei for macOS</a>
+
+    <p class="atayi-muted" id="planDetails"></p>
+  </div>
+
+  <div class="atayi-card" id="errorCard" style="display:none;">
+    <h1>Something went wrong</h1>
+    <p class="subtitle" id="errorMessage">We couldn't retrieve your license code. Please contact support.</p>
+    <a class="atayi-btn" href="mailto:support@atayisensei.io">Email support</a>
+  </div>
+
+  <script type="module">
+    import { api } from "/js/api.js";
+    import { injectSharedStyles } from "/js/shared-styles.js";
+
+    injectSharedStyles();
+
+    const loadingCard = document.getElementById("loadingCard");
+    const successCard = document.getElementById("successCard");
+    const errorCard = document.getElementById("errorCard");
+    const licenseCodeDisplay = document.getElementById("licenseCodeDisplay");
+    const planChip = document.getElementById("planChip");
+    const planDetails = document.getElementById("planDetails");
+    const errorMessage = document.getElementById("errorMessage");
+    const copyCodeButton = document.getElementById("copyCodeButton");
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const stripeSessionId = urlParams.get("session_id");
+
+    if (!stripeSessionId) {
+      loadingCard.style.display = "none";
+      errorCard.style.display = "block";
+      errorMessage.textContent = "Missing Stripe session ID in URL.";
+    } else {
+      fetchLicense();
+    }
+
+    async function fetchLicense(retryCount = 0) {
+      try {
+        const response = await api.retrieveCheckoutSession(stripeSessionId);
+        if (response.ok && response.body.license_code) {
+          showSuccess(response.body);
+          api.trackEvent("checkout_completed", "checkout-success", {
+            plan: response.body.plan,
+            stripe_session_id: stripeSessionId,
+          }).catch(() => {});
+          return;
+        }
+
+        // The webhook might still be processing. Retry up to 6 times (30 s total).
+        if (response.body.error === "license_not_issued" && retryCount < 6) {
+          setTimeout(() => fetchLicense(retryCount + 1), 5000);
+          return;
+        }
+
+        throw new Error(response.body.message || "Could not retrieve license");
+      } catch (error) {
+        loadingCard.style.display = "none";
+        errorCard.style.display = "block";
+        errorMessage.textContent = error.message;
+      }
+    }
+
+    function showSuccess({ license_code, plan, max_devices, monthly_allowance }) {
+      licenseCodeDisplay.textContent = license_code;
+      planChip.textContent = plan.toUpperCase();
+      planChip.classList.add(plan);
+      planDetails.innerHTML = `Plan: <strong>${plan.charAt(0).toUpperCase() + plan.slice(1)}</strong> — ${max_devices} device${max_devices > 1 ? "s" : ""} — ${monthly_allowance.toLocaleString()} credits/month`;
+      loadingCard.style.display = "none";
+      successCard.style.display = "block";
+    }
+
+    copyCodeButton.addEventListener("click", async () => {
+      const code = licenseCodeDisplay.textContent.trim();
+      try {
+        await navigator.clipboard.writeText(code);
+        copyCodeButton.textContent = "✓ Copied!";
+        setTimeout(() => (copyCodeButton.textContent = "Copy code"), 2000);
+      } catch {
+        const range = document.createRange();
+        range.selectNode(licenseCodeDisplay);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+      }
+    });
+  </script>
+</body>
+</html>

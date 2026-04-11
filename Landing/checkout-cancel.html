@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment cancelled — Atayi Sensei</title>
+  <link rel="icon" type="image/png" href="MYE4a.jpg" />
+</head>
+<body>
+  <nav class="atayi-nav">
+    <a class="logo" href="/">
+      <img src="MYE4a.jpg" alt="Atayi Sensei" />
+      <span>Atayi Sensei</span>
+    </a>
+  </nav>
+
+  <div class="atayi-card">
+    <h1>Payment cancelled</h1>
+    <p class="subtitle">No worries — you weren't charged. You can try again or start a free trial instead.</p>
+
+    <a class="atayi-btn" href="/">Back to home</a>
+    <div style="height:10px;"></div>
+    <a class="atayi-btn secondary" href="/trial.html">Start a 7-day free trial</a>
+  </div>
+
+  <script type="module">
+    import { injectSharedStyles } from "/js/shared-styles.js";
+    injectSharedStyles();
+    import("/js/api.js").then(({ api }) => api.trackEvent("page_view", "checkout-cancel").catch(() => {}));
+  </script>
+</body>
+</html>

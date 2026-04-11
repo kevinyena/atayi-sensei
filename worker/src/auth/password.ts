@@ -13,7 +13,13 @@
  * PBKDF2 with 600k iterations is well above OWASP's 2023 recommendation for SHA-256.
  */
 
-const PBKDF2_ITERATIONS = 600_000;
+// Cloudflare Workers' Web Crypto caps PBKDF2 at 100 000 iterations. We
+// go to the maximum allowed; the trade-off vs the OWASP-2023 recommendation
+// of 600k is acceptable here because this secret is an admin password
+// (one principal, enforced by the worker), not a leaked hash being
+// cracked at scale. Combined with the 32-byte salt, an attacker would
+// still need billions of GPU-hours per candidate.
+const PBKDF2_ITERATIONS = 100_000;
 const HASH_BYTE_LENGTH = 32;
 const SALT_BYTE_LENGTH = 32;
 

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Start your free trial — Atayi Sensei</title>
+  <link rel="icon" type="image/png" href="MYE4a.jpg" />
+</head>
+<body>
+  <nav class="atayi-nav">
+    <a class="logo" href="/">
+      <img src="MYE4a.jpg" alt="Atayi Sensei" />
+      <span>Atayi Sensei</span>
+    </a>
+  </nav>
+
+  <div class="atayi-card" id="signupCard">
+    <span class="atayi-plan-chip trial">7-day free trial</span>
+    <h1>Start talking to your AI Sensei</h1>
+    <p class="subtitle">Enter your email to get a license code. 30 minutes of voice per day, no credit card required.</p>
+
+    <form id="signupForm">
+      <label for="emailInput">Email</label>
+      <input type="email" id="emailInput" required autocomplete="email" placeholder="you@example.com" />
+      <div style="height: 16px;"></div>
+      <button type="submit" class="atayi-btn" id="submitButton">
+        Start free trial
+      </button>
+    </form>
+
+    <div id="errorBanner" class="atayi-error" style="display:none;"></div>
+
+    <p class="atayi-muted">
+      Already have a code?
+      <a href="/">Download the app</a> and paste it on first launch.
+    </p>
+  </div>
+
+  <div class="atayi-card" id="successCard" style="display:none;">
+    <span class="atayi-plan-chip trial">Trial activated</span>
+    <h1>🎉 Your license code is ready</h1>
+    <p class="subtitle">
+      Copy this code now and paste it in the Atayi Sensei app after you install it.
+      <strong>This is the only place it will be shown.</strong>
+    </p>
+
+    <div class="atayi-license-code" id="licenseCodeDisplay">—</div>
+
+    <button class="atayi-btn" id="copyCodeButton">Copy code</button>
+
+    <div class="atayi-warning">
+      ⚠️ Save this code in your password manager or a safe place. You won't see it again after leaving this page.
+    </div>
+
+    <div style="height: 12px;"></div>
+
+    <a class="atayi-btn secondary" href="/" id="downloadAppLink">Download Atayi Sensei for macOS</a>
+
+    <p class="atayi-muted">
+      Trial expires in 7 days. <a href="/">Upgrade anytime</a>.
+    </p>
+  </div>
+
+  <script type="module">
+    import { api } from "/js/api.js";
+    import { injectSharedStyles } from "/js/shared-styles.js";
+
+    injectSharedStyles();
+
+    const signupForm = document.getElementById("signupForm");
+    const signupCard = document.getElementById("signupCard");
+    const successCard = document.getElementById("successCard");
+    const emailInput = document.getElementById("emailInput");
+    const submitButton = document.getElementById("submitButton");
+    const errorBanner = document.getElementById("errorBanner");
+    const licenseCodeDisplay = document.getElementById("licenseCodeDisplay");
+    const copyCodeButton = document.getElementById("copyCodeButton");
+
+    // Check for ?plan=starter|ultra query param to redirect straight to checkout
+    // after the email is submitted (upgrade-from-trial-to-paid flow).
+    const queryParams = new URLSearchParams(window.location.search);
+    const requestedPlan = queryParams.get("plan");
+    if (requestedPlan === "starter" || requestedPlan === "ultra") {
+      document.querySelector("#signupCard h1").textContent =
+        requestedPlan === "ultra" ? "Subscribe to Ultra" : "Subscribe to Starter";
+      document.querySelector("#signupCard .subtitle").textContent =
+        "Enter your email, we'll take you to Stripe to complete the payment.";
+      submitButton.textContent = "Continue to payment";
+    }
+
+    signupForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorBanner.style.display = "none";
+      const email = emailInput.value.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errorBanner.textContent = "Please enter a valid email address.";
+        errorBanner.style.display = "block";
+        return;
+      }
+
+      submitButton.disabled = true;
+      submitButton.innerHTML = '<span class="atayi-spinner"></span>&nbsp;Processing…';
+
+      try {
+        if (requestedPlan === "starter" || requestedPlan === "ultra") {
+          // Paid flow: go straight to Stripe checkout
+          const checkoutResponse = await api.createCheckoutSession(requestedPlan, email);
+          if (checkoutResponse.ok && checkoutResponse.body.checkout_url) {
+            window.location.href = checkoutResponse.body.checkout_url;
+            return;
+          }
+          throw new Error(checkoutResponse.body.message || "Could not start checkout");
+        }
+
+        // Trial flow
+        const response = await api.trialSignup(email);
+        if (response.ok && response.body.license_code) {
+          licenseCodeDisplay.textContent = response.body.license_code;
+          signupCard.style.display = "none";
+          successCard.style.display = "block";
+          return;
+        }
+
+        if (response.body.error === "already_registered" && response.body.license_code) {
+          // Idempotent: show existing code
+          licenseCodeDisplay.textContent = response.body.license_code;
+          signupCard.style.display = "none";
+          successCard.style.display = "block";
+          return;
+        }
+
+        throw new Error(response.body.message || "Signup failed");
+      } catch (error) {
+        errorBanner.textContent = error.message;
+        errorBanner.style.display = "block";
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent =
+          requestedPlan === "starter" || requestedPlan === "ultra"
+            ? "Continue to payment"
+            : "Start free trial";
+      }
+    });
+
+    copyCodeButton.addEventListener("click", async () => {
+      const code = licenseCodeDisplay.textContent.trim();
+      try {
+        await navigator.clipboard.writeText(code);
+        copyCodeButton.textContent = "✓ Copied!";
+        setTimeout(() => (copyCodeButton.textContent = "Copy code"), 2000);
+      } catch {
+        // Fallback: select the text
+        const range = document.createRange();
+        range.selectNode(licenseCodeDisplay);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+      }
+    });
+
+    api.trackEvent("page_view", "trial").catch(() => {});
+  </script>
+</body>
+</html>

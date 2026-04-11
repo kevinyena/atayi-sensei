@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin dashboard — Atayi Sensei</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/png" href="MYE4a.jpg" />
+  <style>
+    html, body {
+      margin: 0;
+      background: #0a0b0d;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      min-height: 100vh;
+    }
+
+    .admin-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 28px;
+      background: #0f1011;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .admin-topbar h1 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .admin-topbar h1 img { width: 22px; height: 22px; border-radius: 5px; }
+
+    .admin-container { padding: 28px; max-width: 1400px; margin: 0 auto; }
+
+    .admin-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .admin-stat-card {
+      background: #15171a;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+
+    .admin-stat-card .label {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .admin-stat-card .value {
+      font-size: 28px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .admin-stat-card .sub {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.4);
+      margin-top: 4px;
+    }
+
+    .admin-filters {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .admin-filters input, .admin-filters select {
+      background: #15171a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: white;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .admin-filters input { flex: 1; min-width: 240px; }
+
+    .admin-users-table {
+      width: 100%;
+      background: #15171a;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      overflow: hidden;
+      border-collapse: collapse;
+    }
+
+    .admin-users-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .admin-users-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 13px;
+    }
+
+    .admin-users-table tr.user-row { cursor: pointer; transition: background 0.1s; }
+    .admin-users-table tr.user-row:hover { background: rgba(255, 255, 255, 0.03); }
+
+    .plan-badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .plan-badge.trial { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .plan-badge.starter { background: rgba(234, 179, 8, 0.15); color: #eab308; }
+    .plan-badge.ultra { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    .status-dot.active { background: #4ade80; }
+    .status-dot.trialing { background: #60a5fa; }
+    .status-dot.past_due { background: #eab308; }
+    .status-dot.canceled, .status-dot.incomplete { background: #f87171; }
+
+    .credits-bar {
+      width: 100%;
+      background: #0a0b0d;
+      border-radius: 3px;
+      height: 6px;
+      overflow: hidden;
+    }
+
+    .credits-bar .fill {
+      height: 100%;
+      background: #3b82f6;
+      transition: width 0.3s;
+    }
+
+    .credits-bar .fill.warning { background: #eab308; }
+    .credits-bar .fill.danger { background: #ef4444; }
+
+    .blocked-tag {
+      color: #f87171;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .admin-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 500px;
+      max-width: 100%;
+      height: 100vh;
+      background: #0f1011;
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: -24px 0 80px rgba(0, 0, 0, 0.5);
+      padding: 28px;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.25s ease;
+      z-index: 100;
+    }
+    .admin-drawer.open { transform: translateX(0); }
+
+    .admin-drawer h2 {
+      font-size: 18px;
+      margin: 0 0 6px;
+    }
+
+    .admin-drawer .email {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-bottom: 20px;
+    }
+
+    .admin-drawer .drawer-section {
+      margin-bottom: 22px;
+    }
+
+    .admin-drawer .drawer-section h3 {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 0 0 8px;
+    }
+
+    .admin-drawer .device-row, .admin-drawer .session-row {
+      background: #15171a;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+
+    .btn-small {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.7);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-small:hover { background: rgba(255, 255, 255, 0.05); }
+    .btn-small.danger { border-color: rgba(239, 68, 68, 0.3); color: #f87171; }
+    .btn-small.danger:hover { background: rgba(239, 68, 68, 0.1); }
+
+    .logout-btn {
+      background: none;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.6);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-topbar">
+    <h1>
+      <img src="MYE4a.jpg" alt="Atayi" />
+      Atayi Sensei — Admin
+    </h1>
+    <button class="logout-btn" id="logoutButton">Sign out</button>
+  </div>
+
+  <div class="admin-container">
+    <div class="admin-stats-grid" id="statsGrid">
+      <!-- filled by JS -->
+    </div>
+
+    <h2 style="font-size: 14px; margin: 20px 0 12px; color: rgba(255,255,255,0.7);">Users</h2>
+
+    <div class="admin-filters">
+      <input type="text" id="searchInput" placeholder="Search by email…" />
+      <select id="planFilter">
+        <option value="all">All plans</option>
+        <option value="trial">Trial</option>
+        <option value="starter">Starter</option>
+        <option value="ultra">Ultra</option>
+      </select>
+    </div>
+
+    <table class="admin-users-table" id="usersTable">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Plan</th>
+          <th>Credits used</th>
+          <th>Devices</th>
+          <th>Last active</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="usersBody"></tbody>
+    </table>
+  </div>
+
+  <!-- User drawer -->
+  <div class="admin-drawer" id="userDrawer">
+    <button onclick="document.getElementById('userDrawer').classList.remove('open')" style="background:none; border:none; color:rgba(255,255,255,0.5); font-size:20px; cursor:pointer; float:right;">×</button>
+    <div id="drawerContent"></div>
+  </div>
+
+  <script type="module" src="/js/admin.js"></script>
+</body>
+</html>

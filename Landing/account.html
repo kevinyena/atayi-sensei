@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your account — Atayi Sensei</title>
+  <link rel="icon" type="image/png" href="MYE4a.jpg" />
+</head>
+<body>
+  <nav class="atayi-nav">
+    <a class="logo" href="/">
+      <img src="MYE4a.jpg" alt="Atayi Sensei" />
+      <span>Atayi Sensei</span>
+    </a>
+  </nav>
+
+  <div class="atayi-card">
+    <h1>Manage your subscription</h1>
+    <p class="subtitle">
+      Your subscription is managed by Stripe. Use the customer portal link you received in your original Stripe receipt email to update your payment method, change plans, or cancel.
+    </p>
+
+    <div class="atayi-warning">
+      Lost your license code? Email <a href="mailto:support@atayisensei.io" style="color:inherit; text-decoration:underline;">support@atayisensei.io</a> from the address you used at signup and we'll re-issue it.
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <a class="atayi-btn secondary" href="/">Back to home</a>
+  </div>
+
+  <script type="module">
+    import { injectSharedStyles } from "/js/shared-styles.js";
+    injectSharedStyles();
+    import("/js/api.js").then(({ api }) => api.trackEvent("page_view", "account").catch(() => {}));
+  </script>
+</body>
+</html>
