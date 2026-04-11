@@ -1,3 +1,28 @@
 name = "clicky-proxy"
 main = "src/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Durable Object for Gemini Live WebSocket proxy.
+# Each session (per device, per connection) is a separate DO instance
+# routed by session_id. The DO owns the upstream WS to Gemini, relays
+# frames in both directions, counts tokens in real time, and flushes
+# to Supabase every ~30s.
+[[durable_objects.bindings]]
+name = "GEMINI_SESSION_DO"
+class_name = "GeminiSessionDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GeminiSessionDO"]
+
+# Cron: refresh the admin_user_stats matview in Supabase every 5 minutes
+# so the admin dashboard shows near-real-time consumption without hammering
+# the DB on every page load.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# R2 bucket for DMG / signed binaries — commented out for now, enable in Phase 7.
+# [[r2_buckets]]
+# binding = "ATAYI_DOWNLOADS"
+# bucket_name = "atayi-downloads"

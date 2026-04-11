@@ -1,50 +1,166 @@
 /**
- * Clicky Proxy Worker
+ * Atayi Sensei — Cloudflare Worker router.
  *
- * Vends the Gemini API key for the Gemini Live WebSocket session
- * so the app never ships with raw API keys. Key is stored as a
- * Cloudflare secret.
+ * All API routes live under /api/*. The Landing page hits /api/landing/event
+ * and /api/billing/checkout. The Swift app hits /api/license/*, /api/session/*.
+ * The admin dashboard hits /api/admin/*.
  *
- * Routes:
- *   POST /gemini-live-token  → Returns Gemini API key for Live WebSocket sessions
+ * WebSocket proxy for Gemini Live is handled by a Durable Object (GeminiSessionDO)
+ * routed by session_id, one DO instance per concurrent session.
  */
 
-interface Env {
-  GEMINI_API_KEY: string;
-}
+import { handleTrialSignup } from "./routes/trial";
+import { handleLicenseActivate, handleLicenseStatus } from "./routes/license";
+import {
+  handleCheckoutCreate,
+  handleCheckoutSessionRetrieve,
+  handleStripeWebhook,
+} from "./routes/billing";
+import { handleSessionPreflight } from "./routes/session";
+import { handleLandingEvent, handleRefreshStats } from "./routes/landing";
+import {
+  handleAdminLogin,
+  handleAdminStats,
+  handleAdminUsers,
+  handleAdminUserDetail,
+  handleAdminBlockUser,
+  handleAdminUnblockUser,
+  handleAdminBlockDevice,
+  handleAdminUnblockDevice,
+} from "./routes/admin";
+import {
+  corsPreflightResponse,
+  errorResponse,
+  methodNotAllowedResponse,
+  notFoundResponse,
+} from "./lib/response";
+import type { Env } from "./types";
+
+export { GeminiSessionDO } from "./do/gemini-session";
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const method = request.method.toUpperCase();
 
-    if (request.method !== "POST") {
-      return new Response("Method not allowed", { status: 405 });
+    // CORS preflight for any /api/* route
+    if (method === "OPTIONS" && url.pathname.startsWith("/api/")) {
+      return corsPreflightResponse();
     }
 
     try {
-      if (url.pathname === "/gemini-live-token") {
-        return await handleGeminiLiveToken(env);
+      // ========== Landing analytics (public) ==========
+      if (url.pathname === "/api/landing/event" && method === "POST") {
+        return await handleLandingEvent(request, env);
       }
-    } catch (error) {
-      console.error(`[${url.pathname}] Unhandled error:`, error);
-      return new Response(
-        JSON.stringify({ error: String(error) }),
-        { status: 500, headers: { "content-type": "application/json" } }
-      );
-    }
 
-    return new Response("Not found", { status: 404 });
+      // ========== Auth / trial ==========
+      if (url.pathname === "/api/auth/trial-signup" && method === "POST") {
+        return await handleTrialSignup(request, env);
+      }
+
+      // ========== License ==========
+      if (url.pathname === "/api/license/activate" && method === "POST") {
+        return await handleLicenseActivate(request, env);
+      }
+      if (url.pathname === "/api/license/status" && method === "GET") {
+        return await handleLicenseStatus(request, env);
+      }
+
+      // ========== Billing ==========
+      if (url.pathname === "/api/billing/checkout" && method === "POST") {
+        return await handleCheckoutCreate(request, env);
+      }
+      if (url.pathname === "/api/billing/webhook" && method === "POST") {
+        return await handleStripeWebhook(request, env);
+      }
+      const checkoutSessionMatch = url.pathname.match(/^\/api\/billing\/session\/([A-Za-z0-9_]+)$/);
+      if (checkoutSessionMatch && method === "GET") {
+        return await handleCheckoutSessionRetrieve(request, env, checkoutSessionMatch[1]);
+      }
+
+      // ========== Session ==========
+      if (url.pathname === "/api/session/preflight" && method === "POST") {
+        return await handleSessionPreflight(request, env);
+      }
+
+      // Session WebSocket routed to Durable Object, one instance per session_id
+      if (url.pathname === "/api/session/live") {
+        const sessionToken = url.searchParams.get("session_token");
+        if (!sessionToken) {
+          return errorResponse("missing_session_token", "session_token query param required", 401);
+        }
+        // We use the session_token hash as the DO name so each concurrent session
+        // gets its own isolated DO instance. Since JWTs are per-session, no two
+        // sessions share the same DO.
+        const doName = await sha256Hex(sessionToken);
+        const doId = env.GEMINI_SESSION_DO.idFromName(doName);
+        const doStub = env.GEMINI_SESSION_DO.get(doId);
+        return doStub.fetch(request);
+      }
+
+      // ========== Admin ==========
+      if (url.pathname === "/api/admin/login" && method === "POST") {
+        return await handleAdminLogin(request, env);
+      }
+      if (url.pathname === "/api/admin/stats" && method === "GET") {
+        return await handleAdminStats(request, env);
+      }
+      if (url.pathname === "/api/admin/users" && method === "GET") {
+        return await handleAdminUsers(request, env);
+      }
+      const userDetailMatch = url.pathname.match(/^\/api\/admin\/user\/([a-f0-9-]{36})$/);
+      if (userDetailMatch && method === "GET") {
+        return await handleAdminUserDetail(request, env, userDetailMatch[1]);
+      }
+      if (url.pathname === "/api/admin/block-user" && method === "POST") {
+        return await handleAdminBlockUser(request, env);
+      }
+      if (url.pathname === "/api/admin/unblock-user" && method === "POST") {
+        return await handleAdminUnblockUser(request, env);
+      }
+      if (url.pathname === "/api/admin/block-device" && method === "POST") {
+        return await handleAdminBlockDevice(request, env);
+      }
+      if (url.pathname === "/api/admin/unblock-device" && method === "POST") {
+        return await handleAdminUnblockDevice(request, env);
+      }
+
+      // Backwards-compat: the legacy route still exists so existing builds of
+      // the Swift app (pre-license system) don't crash. It's scheduled for
+      // removal once all distributed builds are upgraded.
+      if (url.pathname === "/gemini-live-token" && method === "POST") {
+        return errorResponse(
+          "deprecated_route",
+          "This endpoint is deprecated. Upgrade the Atayi Sensei app to continue.",
+          410,
+        );
+      }
+
+      if (url.pathname.startsWith("/api/")) {
+        return method === "GET" || method === "POST" ? notFoundResponse() : methodNotAllowedResponse();
+      }
+
+      return new Response("Atayi Sensei API — use /api/*", { status: 200 });
+    } catch (error) {
+      console.error(`[${url.pathname}] unhandled`, error);
+      return errorResponse("internal_error", String(error), 500);
+    }
+  },
+
+  /**
+   * Cron trigger: refresh the admin_user_stats matview every 5 minutes
+   * so the admin dashboard shows near-real-time consumption without
+   * hitting the db on every page load.
+   */
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(handleRefreshStats(env).catch((error) => console.error("[cron refresh-stats]", error)));
   },
 };
 
-/**
- * Returns the Gemini API key so the Swift client can open a Gemini Live
- * WebSocket directly. The key is stored as a Cloudflare secret and never
- * ships in the app binary.
- */
-async function handleGeminiLiveToken(env: Env): Promise<Response> {
-  return new Response(JSON.stringify({ key: env.GEMINI_API_KEY }), {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  });
+async function sha256Hex(input: string): Promise<string> {
+  const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
