@@ -216,6 +216,53 @@ fi
 
 create-dmg "${DMG_OPTIONS[@]}" "${DMG_PATH}" "${FINAL_APP}"
 
+# ── Step 5 (developer-id only): Sign + notarize + staple the DMG itself ─────
+#
+# The .app inside the DMG is already signed + notarized + stapled (steps 1-3).
+# But Gatekeeper also checks the DMG file itself when the user mounts it after
+# downloading from the web. Without these extra steps, `spctl -a -t install`
+# would reject the DMG even though the app inside is fine.
+#
+# Order matters:
+#   1. Sign the DMG with the same Developer ID Application cert
+#   2. Submit the signed DMG to notarytool (the signature changes the hash,
+#      so we have to re-notarize even if we already notarized the .app)
+#   3. Staple the notarization ticket to the DMG so Gatekeeper can verify
+#      offline at first mount
+
+if [ "${MODE}" = "developer-id" ]; then
+    DEV_ID_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
+        | grep "Developer ID Application" \
+        | head -1 \
+        | awk -F'"' '{print $2}')
+
+    if [ -z "${DEV_ID_IDENTITY}" ]; then
+        echo "❌ No 'Developer ID Application' cert found in Keychain."
+        echo "   Install one via Xcode → Settings → Accounts → Manage Certificates."
+        exit 1
+    fi
+
+    echo "🔏 [5/7] Signing DMG with ${DEV_ID_IDENTITY}…"
+    codesign --force --sign "${DEV_ID_IDENTITY}" --timestamp "${DMG_PATH}"
+    echo "    ✅ DMG signed"
+
+    echo "📤 [6/7] Submitting signed DMG to Apple notary service (2-5 min wait)…"
+    xcrun notarytool submit "${DMG_PATH}" \
+        --keychain-profile "AC_PASSWORD" \
+        --wait
+    echo "    ✅ DMG notarized"
+
+    echo "📎 [7/7] Stapling notarization ticket to DMG…"
+    xcrun stapler staple "${DMG_PATH}"
+    xcrun stapler validate "${DMG_PATH}"
+    echo "    ✅ DMG stapled"
+
+    echo ""
+    echo "🔍 Final Gatekeeper assessment:"
+    spctl -a -vvv -t install "${DMG_PATH}" 2>&1 || true
+    echo ""
+fi
+
 echo ""
 echo "🎉 ${DISPLAY_NAME} v${MARKETING_VERSION} DMG ready:"
 echo "    ${DMG_PATH}"
