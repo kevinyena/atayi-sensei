@@ -1,152 +1,145 @@
-# Hi, this is Clicky.
-It's an AI teacher that lives as a buddy next to your cursor. It can see your screen, talk to you, and even point at stuff. Kinda like having a real teacher next to you.
+# Atayi Sensei
 
-Download it [here](https://www.clicky.so/) for free.
+An AI teacher that lives next to your cursor. Press a hotkey, talk to it, and it sees your screen, replies with its voice, and can point at things on any of your monitors.
 
-Here's the [original tweet](https://x.com/FarzaTV/status/2041314633978659092) that kinda blew up for a demo for more context.
+Runs entirely in your macOS menu bar — no dock icon, no main window. The voice session is a persistent **Gemini Live** WebSocket that handles voice activity detection, vision, reasoning, speech-to-text, and audio output natively in a single model.
 
-![Clicky — an ai buddy that lives on your mac](clicky-demo.gif)
+This project is a fork of [farzaa/clicky](https://github.com/farzaa/clicky), rewritten around Gemini Live. All the legacy Anthropic / AssemblyAI / ElevenLabs / OpenAI code paths have been removed — only the Gemini Live runtime remains.
 
-This is the open-source version of Clicky for those that want to hack on it, build their own features, or just see how it works under the hood.
+## What it does
 
-## Get started with Claude Code
+- **Push-to-talk**: press `ctrl + option` once to open a live voice session, press again to close it.
+- **Sees your screen**: screenshots are streamed to Gemini Live on demand so the model can talk about what you're actually looking at.
+- **Speaks back**: Gemini Live generates audio responses natively — no external TTS.
+- **Points at things**: the model can call `annotate_element(x, y, width, height, shape, label, screen_index)` to draw circles, rectangles, underlines, highlights, or arrows on any connected monitor. The overlay fades out as soon as your cursor approaches the annotation.
 
-The fastest way to get this running is with [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+## Architecture overview
 
-Once you get Claude running, paste this:
+- **App type**: menu bar only (`LSUIElement = true`), no dock icon, no main window.
+- **Framework**: SwiftUI with AppKit bridging for the menu bar panel and the full-screen cursor overlay.
+- **Voice**: single persistent Gemini Live WebSocket. The Swift client fetches the Gemini API key from a Cloudflare Worker endpoint at session open, then opens the WebSocket directly.
+- **Screen capture**: ScreenCaptureKit (macOS 14.2+), multi-monitor support.
+- **Push-to-talk**: a listen-only `CGEvent` tap captures `ctrl + option` system-wide, even when the app is not focused.
+- **Analytics**: PostHog.
 
-```
-Hi Claude.
+### API proxy (Cloudflare Worker)
 
-Clone https://github.com/farzaa/clicky.git into my current directory.
+The Gemini API key never ships in the app binary. A tiny Cloudflare Worker (`worker/src/index.ts`) holds it as a secret and hands it to the Swift client at session start.
 
-Then read the CLAUDE.md. I want to get Clicky running locally on my Mac.
+| Route | Purpose |
+|---|---|
+| `POST /gemini-live-token` | Returns the Gemini API key so the Swift client can open a Gemini Live WebSocket directly |
 
-Help me set up everything — the Cloudflare Worker with my own API keys, the proxy URLs, and getting it building in Xcode. Walk me through it.
-```
+Worker secret: `GEMINI_API_KEY`
 
-That's it. It'll clone the repo, read the docs, and walk you through the whole setup. Once you're running you can just keep talking to it — build features, fix bugs, whatever. Go crazy.
+For the full technical breakdown (state machine, overlay rendering, multi-monitor coordinate mapping, etc.), read [`AGENTS.md`](./AGENTS.md).
 
-## Manual setup
+## Prerequisites
 
-If you want to do it yourself, here's the deal.
-
-### Prerequisites
-
-- macOS 14.2+ (for ScreenCaptureKit)
-- Xcode 15+
-- Node.js 18+ (for the Cloudflare Worker)
+- macOS 14.2 or later (required for ScreenCaptureKit)
+- Xcode 16 or later (the project uses `PBXFileSystemSynchronizedRootGroup`)
+- Node.js 18 or later (for the Cloudflare Worker)
 - A [Cloudflare](https://cloudflare.com) account (free tier works)
-- API keys for: [Anthropic](https://console.anthropic.com), [AssemblyAI](https://www.assemblyai.com), [ElevenLabs](https://elevenlabs.io)
+- A [Google AI Studio](https://aistudio.google.com/apikey) API key with Gemini Live access
 
-### 1. Set up the Cloudflare Worker
+## Setup
 
-The Worker is a tiny proxy that holds your API keys. The app talks to the Worker, the Worker talks to the APIs. This way your keys never ship in the app binary.
+### 1. Deploy the Cloudflare Worker
+
+The Worker is a ~50-line proxy that holds your Gemini API key as a Cloudflare secret and returns it to the Swift client at session open.
 
 ```bash
 cd worker
 npm install
-```
 
-Now add your secrets. Wrangler will prompt you to paste each one:
+# Paste your Gemini API key when prompted
+npx wrangler secret put GEMINI_API_KEY
 
-```bash
-npx wrangler secret put ANTHROPIC_API_KEY
-npx wrangler secret put ASSEMBLYAI_API_KEY
-npx wrangler secret put ELEVENLABS_API_KEY
-```
-
-For the ElevenLabs voice ID, open `wrangler.toml` and set it there (it's not sensitive):
-
-```toml
-[vars]
-ELEVENLABS_VOICE_ID = "your-voice-id-here"
-```
-
-Deploy it:
-
-```bash
+# Deploy
 npx wrangler deploy
 ```
 
-It'll give you a URL like `https://your-worker-name.your-subdomain.workers.dev`. Copy that.
+Wrangler will print the deployed URL, something like `https://<your-worker-name>.<your-subdomain>.workers.dev`. Copy it.
 
-### 2. Run the Worker locally (for development)
+#### Local development (optional)
 
-If you want to test changes to the Worker without deploying:
+If you want to iterate on the Worker without redeploying each time:
 
 ```bash
 cd worker
+echo 'GEMINI_API_KEY=<your-key>' > .dev.vars
 npx wrangler dev
 ```
 
-This starts a local server (usually `http://localhost:8787`) that behaves exactly like the deployed Worker. You'll need to create a `.dev.vars` file in the `worker/` directory with your keys:
+This starts a local server at `http://localhost:8787` that behaves like the deployed Worker. Point the Swift client at it while developing (see step 2).
 
-```
-ANTHROPIC_API_KEY=sk-ant-...
-ASSEMBLYAI_API_KEY=...
-ELEVENLABS_API_KEY=...
-ELEVENLABS_VOICE_ID=...
-```
+### 2. Point the app at your Worker
 
-Then update the proxy URLs in the Swift code to point to `http://localhost:8787` instead of the deployed Worker URL while developing. Grep for `clicky-proxy` to find them all.
+Open `leanring-buddy/CompanionManager.swift` and update the Worker URL:
 
-### 3. Update the proxy URLs in the app
-
-The app has the Worker URL hardcoded in a few places. Search for `your-worker-name.your-subdomain.workers.dev` and replace it with your Worker URL:
-
-```bash
-grep -r "clicky-proxy" leanring-buddy/
+```swift
+private static let workerBaseURL = "https://<your-worker-name>.<your-subdomain>.workers.dev"
 ```
 
-You'll find it in:
-- `CompanionManager.swift` — Claude chat + ElevenLabs TTS
-- `AssemblyAIStreamingTranscriptionProvider.swift` — AssemblyAI token endpoint
+(The current value is hardcoded to the author's own Worker. There's no config file — just this one line.)
 
-### 4. Open in Xcode and run
+### 3. Build in Xcode
 
 ```bash
 open leanring-buddy.xcodeproj
 ```
 
 In Xcode:
-1. Select the `leanring-buddy` scheme (yes, the typo is intentional, long story)
-2. Set your signing team under Signing & Capabilities
-3. Hit **Cmd + R** to build and run
+1. Select the `leanring-buddy` scheme (the "leanring" typo is legacy and intentional — renaming it breaks derived data and the Sparkle update signing flow).
+2. Set your signing team under **Signing & Capabilities**.
+3. Hit **Cmd + R** to build and run.
 
-The app will appear in your menu bar (not the dock). Click the icon to open the panel, grant the permissions it asks for, and you're good.
+The app shows up in your menu bar. Click the icon to open the panel and grant the permissions it requests.
 
-### Permissions the app needs
+> ⚠️ Do **not** run `xcodebuild` from the terminal — it invalidates TCC (Transparency, Consent, Control) permissions and the app will lose screen recording, accessibility, and microphone access until you re-grant them manually.
 
-- **Microphone** — for push-to-talk voice capture
-- **Accessibility** — for the global keyboard shortcut (Control + Option)
-- **Screen Recording** — for taking screenshots when you use the hotkey
-- **Screen Content** — for ScreenCaptureKit access
+### 4. Grant the permissions
 
-## Architecture
+The app asks for four things on first launch:
 
-If you want the full technical breakdown, read `CLAUDE.md`. But here's the short version:
-
-**Menu bar app** (no dock icon) with two `NSPanel` windows — one for the control panel dropdown, one for the full-screen transparent cursor overlay. Push-to-talk streams audio over a websocket to AssemblyAI, sends the transcript + screenshot to Claude via streaming SSE, and plays the response through ElevenLabs TTS. Claude can embed `[POINT:x,y:label:screenN]` tags in its responses to make the cursor fly to specific UI elements across multiple monitors. All three APIs are proxied through a Cloudflare Worker.
+- **Microphone** — for voice capture into the Gemini Live session.
+- **Accessibility** — for the global `ctrl + option` keyboard shortcut.
+- **Screen Recording** — for taking screenshots to send to Gemini.
+- **Screen Content** — for ScreenCaptureKit multi-monitor capture.
 
 ## Project structure
 
 ```
-leanring-buddy/          # Swift source (yes, the typo stays)
-  CompanionManager.swift    # Central state machine
-  CompanionPanelView.swift  # Menu bar panel UI
-  ClaudeAPI.swift           # Claude streaming client
-  ElevenLabsTTSClient.swift # Text-to-speech playback
-  OverlayWindow.swift       # Blue cursor overlay
-  AssemblyAI*.swift         # Real-time transcription
-  BuddyDictation*.swift     # Push-to-talk pipeline
-worker/                  # Cloudflare Worker proxy
-  src/index.ts              # Three routes: /chat, /tts, /transcribe-token
-CLAUDE.md                # Full architecture doc (agents read this)
+app/
+├── leanring-buddy/              # Swift sources (15 files)
+│   ├── leanring_buddyApp.swift     # Menu bar app entry point
+│   ├── CompanionManager.swift      # Central state machine
+│   ├── GeminiLiveSession.swift     # Gemini Live WebSocket session
+│   ├── MenuBarPanelManager.swift   # NSStatusItem + floating NSPanel
+│   ├── CompanionPanelView.swift    # SwiftUI panel content
+│   ├── OverlayWindow.swift         # Full-screen transparent cursor overlay
+│   ├── CompanionResponseOverlay.swift
+│   ├── CompanionScreenCaptureUtility.swift
+│   ├── BuddyAudioConversionSupport.swift  # PCM16 mic audio converter
+│   ├── BuddyPushToTalkShortcut.swift      # ctrl+option detection
+│   ├── GlobalPushToTalkShortcutMonitor.swift
+│   ├── ElementLocationDetector.swift
+│   ├── DesignSystem.swift
+│   ├── ClickyAnalytics.swift
+│   ├── WindowPositionManager.swift
+│   └── AppBundleConfiguration.swift
+├── leanring-buddy.xcodeproj/    # Xcode 16+ (PBXFileSystemSynchronizedRootGroup)
+├── worker/                      # Cloudflare Worker proxy
+│   └── src/index.ts                # One route: /gemini-live-token
+├── scripts/                     # Release automation (release.sh)
+├── AGENTS.md                    # Full architecture doc for AI agents
+└── CLAUDE.md                    # → symlink to AGENTS.md
 ```
 
 ## Contributing
 
-PRs welcome. If you're using Claude Code, it already knows the codebase — just tell it what you want to build and point it at `CLAUDE.md`.
+PRs welcome. If you use an AI coding agent (Claude Code, Cursor, Copilot, etc.), they can read [`AGENTS.md`](./AGENTS.md) for the full architecture — it's the single source of truth and is kept in sync with the code.
 
-Got feedback? DM me on X [@farzatv](https://x.com/farzatv).
+## Credits
+
+Forked from [Clicky](https://github.com/farzaa/clicky) by [@FarzaTV](https://x.com/FarzaTV). The original project used Claude + AssemblyAI + ElevenLabs; this fork replaces the entire voice stack with Gemini Live and strips out the unused code paths.
