@@ -1,151 +1,278 @@
-# Clicky - Agent Instructions
+# Atayi Sensei — Agent Instructions
 
 <!-- This is the single source of truth for all AI coding agents. CLAUDE.md is a symlink to this file. -->
 <!-- AGENTS.md spec: https://github.com/agentsmd/agents.md — supported by Claude Code, Cursor, Copilot, Gemini CLI, and others. -->
 
 ## Overview
 
-macOS menu bar companion app. Lives entirely in the macOS status bar (no dock icon, no main window). Clicking the menu bar icon opens a custom floating panel with companion voice controls. Uses push-to-talk (ctrl+option) to open a **Gemini Live** session — a persistent multimodal WebSocket that handles voice activity detection, vision (screenshots), reasoning, and audio output natively in a single model. A blue cursor overlay can fly to and point at UI elements Gemini references on any connected monitor.
+Atayi Sensei is a macOS menu bar companion app that teaches indie game creators. It lives entirely in the status bar (no dock icon, no main window). Pressing `ctrl + option` opens a persistent **Gemini Live** WebSocket session — a multimodal model that handles voice activity detection, vision (screenshots), reasoning, speech-to-text, and audio output natively. A blue cursor overlay can fly to and point at UI elements Gemini references on any connected monitor.
 
-The Gemini API key lives on a Cloudflare Worker proxy and is fetched at session open — nothing sensitive ships in the app binary.
+The project is a SaaS product with a full backend: Cloudflare Workers + Durable Objects proxy all API calls so the Gemini API key never ships in the binary; Supabase stores users, subscriptions, devices, and sessions; Stripe handles payments; a landing page + admin dashboard are deployed on Cloudflare Pages.
 
 ## Architecture
 
-- **App Type**: Menu bar-only (`LSUIElement=true`), no dock icon or main window
+### High-level flow
+
+```
+macOS app → Worker /api/session/preflight → Worker Durable Object → Gemini Live
+                     ↓                              ↓
+                  Supabase                       Supabase
+                  (license + credits)            (token accounting every 30s)
+
+Landing page → Worker /api/billing/checkout → Stripe Checkout → Worker webhook → Supabase
+```
+
+### Components
+
+- **App type**: Menu bar-only (`LSUIElement=true`), no dock icon or main window
 - **Framework**: SwiftUI (macOS native) with AppKit bridging for menu bar panel and cursor overlay
 - **Pattern**: MVVM with `@StateObject` / `@Published` state management
-- **Voice Session**: **Gemini Live** — persistent WebSocket session with native VAD, vision, reasoning, speech-to-text, and audio output. The Swift client fetches the Gemini API key from the Cloudflare Worker and opens the WebSocket directly. All audio (mic capture + model response playback) and transcription happen inside the Gemini Live session — there is no separate transcription provider.
-- **Screen Capture**: ScreenCaptureKit (macOS 14.2+), multi-monitor support
-- **Voice Input**: Push-to-talk toggle via a system-wide listen-only CGEvent tap. Ctrl+Option opens/closes the Gemini Live session; mic capture goes directly to the live session.
-- **Element Annotation**: Gemini calls `annotate_element(x, y, width, height, shape, label, screen_index)` when it wants to highlight a UI element. CompanionManager converts screenshot-pixel coordinates to AppKit global coordinates and publishes `activeAnnotation: ScreenAnnotation`. The overlay draws the appropriate shape (circle, rectangle, underline, highlight, or arrow) with a blue glow on the correct screen. The annotation fades out and is cleared when the user's cursor comes within 10px of its center.
+- **Voice session**: **Gemini Live** — persistent WebSocket proxied through a Cloudflare **Durable Object** (`GeminiSessionDO`). The DO opens the upstream connection to `wss://generativelanguage.googleapis.com` with the real `GEMINI_API_KEY` on the server side, then relays frames in both directions to the Swift client. Every 30 s it flushes token counts into Supabase via RPC functions (`increment_subscription_credits`, `increment_daily_usage`). If usage exceeds the plan limit mid-session, the DO sends an `atayiServerEvent.blocked` frame and closes the sockets.
+- **Screen capture**: ScreenCaptureKit (macOS 14.2+), multi-monitor support
+- **Voice input**: push-to-talk via a listen-only `CGEvent` tap (`ctrl + option`) so the shortcut is captured even when the app is in the background
+- **Element annotation**: Gemini calls `annotate_element(x, y, width, height, shape, label, screen_index)` when it wants to highlight a UI element. `CompanionManager` converts screenshot-pixel coordinates to AppKit global coordinates and publishes `activeAnnotation: ScreenAnnotation`. The overlay draws the shape with a blue glow and fades it out once the cursor approaches
 - **Concurrency**: `@MainActor` isolation, async/await throughout
-- **Analytics**: PostHog via `ClickyAnalytics.swift`
+- **Analytics**: PostHog via `ClickyAnalytics.swift` + Supabase `landing_events` for the marketing funnel
 
-### API Proxy (Cloudflare Worker)
+### Cloudflare Worker backend (`worker/src/`)
 
-The Gemini API key is vended through a Cloudflare Worker (`worker/src/index.ts`) so it never ships in the app binary.
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/auth/trial-signup` | POST | Create trial account, return license code |
+| `/api/license/activate` | POST | Bind a license code to `device_fingerprint`, return JWT device token (7d) |
+| `/api/license/status` | GET | Check subscription state + credits + daily cap |
+| `/api/session/preflight` | POST | Pre-flight: verify license, credits, cap → return session token + `ws_url` |
+| `/api/session/live` | WS | WebSocket routed to a per-session `GeminiSessionDO` that proxies Gemini Live |
+| `/api/billing/checkout` | POST | Create Stripe Checkout Session |
+| `/api/billing/webhook` | POST | Stripe webhook receiver (checkout.completed, invoice.paid, sub.updated/deleted, payment_failed) |
+| `/api/billing/session/:id` | GET | Retrieve Stripe Checkout session → return license code to the success page |
+| `/api/landing/event` | POST | Record page views / downloads / checkout events for analytics |
+| `/api/admin/login` | POST | Admin password gate → returns scoped JWT (24h) |
+| `/api/admin/stats` | GET | Dashboard tiles (visits, downloads, MRR, trials, etc.) |
+| `/api/admin/users` | GET | Filtered user list (reads `admin_user_stats` matview) |
+| `/api/admin/user/:id` | GET | Single user detail + devices + recent sessions |
+| `/api/admin/block-user` | POST | Block user (sets `users.is_blocked = true`) |
+| `/api/admin/block-device` | POST | Block a specific device fingerprint |
 
-| Route | Purpose |
-|-------|---------|
-| `POST /gemini-live-token` | Returns the Gemini API key so the Swift client can open a Gemini Live WebSocket directly |
+Scheduled: cron `*/5 * * * *` → `REFRESH MATERIALIZED VIEW admin_user_stats` via the RPC function `refresh_admin_stats`.
 
-Worker secret: `GEMINI_API_KEY`
+### Supabase schema (`infra/supabase/schema.sql`)
 
-### Key Architecture Decisions
+Tables: `users`, `subscriptions`, `license_codes`, `devices`, `sessions`, `daily_usage`, `landing_events`, `admin_audit_log`.
+Matview: `admin_user_stats` (refreshed by the cron).
+RPC functions: `increment_subscription_credits`, `increment_daily_usage`, `refresh_admin_stats`.
 
-**Menu Bar Panel Pattern**: The companion panel uses `NSStatusItem` for the menu bar icon and a custom borderless `NSPanel` for the floating control panel. This gives full control over appearance (dark, rounded corners, custom shadow) and avoids the standard macOS menu/popover chrome. The panel is non-activating so it doesn't steal focus. A global event monitor auto-dismisses it on outside clicks.
+The worker is the only client that talks to Supabase, using the `service_role` key. Row-Level Security is not enabled because the frontend never hits PostgREST directly.
 
-**Cursor Overlay**: A full-screen transparent `NSPanel` hosts the blue cursor companion. It's non-activating, joins all Spaces, and never steals focus. The cursor position, response text, waveform, and pointing animations all render in this overlay via SwiftUI through `NSHostingView`.
+### Plan economics
 
-**Global Push-To-Talk Shortcut**: Background push-to-talk uses a listen-only `CGEvent` tap instead of an AppKit global monitor so modifier-based shortcuts like `ctrl + option` are detected more reliably while the app is running in the background.
+1 credit = 1 second of talk time. Derived from Gemini Live pricing (`$3/M` audio in, `$12/M` audio out, 25 tokens/sec).
 
-**Transient Cursor Mode**: When "Show Clicky" is off, pressing the hotkey fades in the cursor overlay for the duration of the interaction (recording → response → TTS → optional pointing), then fades it out automatically after 1 second of inactivity.
+| Plan | Price | Credits/month | Max devices | Trial daily cap |
+|---|---|---|---|---|
+| Trial (7 days) | free | 1 800 / day soft cap | 1 | 1 800 credits (= 30 min) |
+| Starter | $19/mo | 40 000 (~11 h) | 1 | — |
+| Ultra | $49/mo | 160 000 (~44 h, shared) | 3 | — |
 
-## Key Files
+### Security invariants
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `leanring_buddyApp.swift` | ~89 | Menu bar app entry point. Uses `@NSApplicationDelegateAdaptor` with `CompanionAppDelegate` which creates `MenuBarPanelManager` and starts `CompanionManager`. No main window — the app lives entirely in the status bar. |
-| `CompanionManager.swift` | ~1000 | Central state machine. Owns shortcut monitoring, screen capture, the Gemini Live session, and overlay management. Tracks voice state (idle/listening/processing/responding) and cursor visibility. Coordinates the push-to-talk → Gemini Live → audio + pointing pipeline. |
-| `GeminiLiveSession.swift` | ~480 | Persistent Gemini Live WebSocket session. Fetches the Gemini API key from the Worker `/gemini-live-token`, opens the websocket, streams mic audio + screenshots, and plays native audio responses via `speakerAudioEngine`. Single model handles VAD, vision, reasoning, speech-to-text, and TTS. |
-| `MenuBarPanelManager.swift` | ~243 | NSStatusItem + custom NSPanel lifecycle. Creates the menu bar icon, manages the floating companion panel (show/hide/position), installs click-outside-to-dismiss monitor. |
-| `CompanionPanelView.swift` | ~761 | SwiftUI panel content for the menu bar dropdown. Shows companion status, push-to-talk instructions, model picker (Sonnet/Opus), permissions UI, DM feedback button, and quit button. Dark aesthetic using `DS` design system. |
-| `OverlayWindow.swift` | ~881 | Full-screen transparent overlay hosting the blue cursor, response text, waveform, and spinner. Handles cursor animation, element pointing with bezier arcs, multi-monitor coordinate mapping, and fade-out transitions. |
-| `CompanionResponseOverlay.swift` | ~217 | SwiftUI view for the response text bubble and waveform displayed next to the cursor in the overlay. |
-| `CompanionScreenCaptureUtility.swift` | ~132 | Multi-monitor screenshot capture using ScreenCaptureKit. Returns labeled image data for each connected display. |
-| `BuddyAudioConversionSupport.swift` | ~70 | `BuddyPCM16AudioConverter`: converts live mic buffers to PCM16 mono audio for the Gemini Live session. |
-| `GlobalPushToTalkShortcutMonitor.swift` | ~132 | System-wide push-to-talk monitor. Owns the listen-only `CGEvent` tap and publishes press/release transitions. |
-| `ElementLocationDetector.swift` | ~335 | Detects UI element locations in screenshots for cursor pointing. |
-| `DesignSystem.swift` | ~880 | Design system tokens — colors, corner radii, shared styles. All UI references `DS.Colors`, `DS.CornerRadius`, etc. |
-| `ClickyAnalytics.swift` | ~121 | PostHog analytics integration for usage tracking. |
-| `WindowPositionManager.swift` | ~262 | Window placement logic, Screen Recording permission flow, and accessibility permission helpers. |
-| `AppBundleConfiguration.swift` | ~28 | Runtime configuration reader for keys stored in the app bundle Info.plist. |
-| `worker/src/index.ts` | ~50 | Cloudflare Worker proxy. One route: `/gemini-live-token` returns the Gemini API key for the Gemini Live WebSocket session. |
+- **No API keys in the app binary.** Gemini, Stripe, Supabase service_role — all live only in Cloudflare Worker secrets.
+- **Short-lived session tokens (5 min)** limit the blast radius of a leaked token mid-session.
+- **Device binding** uses SHA-256 of `IOPlatformUUID` so two Macs are never conflated (and reinstall-stable).
+- **Admin password** hashed with PBKDF2-SHA256, **100 000 iterations** (Cloudflare Workers Web Crypto maximum). 32-byte random salt, constant-time comparison on verify.
+- **Stripe webhooks** verified against `STRIPE_WEBHOOK_SECRET` with HMAC-SHA256 and a 5-minute timestamp tolerance window.
+- **Rate limiting** (planned): at the Worker level per IP/user for `/api/auth/*`, `/api/license/activate`, `/api/session/preflight`.
 
-## Build & Run
+### Key architecture decisions
+
+**Durable Objects for the voice proxy**: Cloudflare Workers are stateless. A bidirectional WebSocket relay needs long-lived state (the upstream connection, token counters, buffered frames). Each session gets its own DO instance keyed by `sha256(session_token)`, so concurrent sessions are fully isolated. The DO is deleted when the WebSocket closes.
+
+**Token accounting on the Worker side, not the client**: the Swift app would lie about usage if it reported credits itself. The DO sees every frame, counts tokens by inspecting `realtimeInput.audio.data` (base64 length → bytes → tokens at 25 tokens/sec) and `serverContent.modelTurn.parts[].inlineData`, and flushes absolute totals to Supabase every 30 s. If credits run out mid-conversation, the DO sends `atayiServerEvent.blocked` before closing so the Swift UI can show a user-friendly error.
+
+**License codes are display artifacts, JWTs do the work**: The user types a `ATAYI-...-XXXX-XXXX-XXXX` code once on activation. The worker looks it up in `license_codes`, validates the subscription, and returns a JWT `device_token`. From that point on, the app uses the JWT (stored in Keychain `.whenUnlockedThisDeviceOnly`) for all requests. The license code is only shown again on `account.html` for reference.
+
+**Menu bar panel pattern**: uses `NSStatusItem` + a borderless non-activating `NSPanel` so the app can render a dark rounded-corner dropdown that doesn't steal focus. A global event monitor auto-dismisses on outside clicks.
+
+**Cursor overlay**: full-screen transparent non-activating `NSPanel` joined to all Spaces. Hosts the blue cursor, waveform, spinner, and response text via `NSHostingView`.
+
+**Global push-to-talk**: listen-only `CGEvent` tap (not an AppKit global monitor) so modifier-only combos like `ctrl + option` are detected reliably while the app is in the background.
+
+## Key files
+
+### Swift app (`leanring-buddy/`)
+
+| File | ~Lines | Purpose |
+|---|---|---|
+| `leanring_buddyApp.swift` | ~100 | Entry point. `CompanionAppDelegate` creates `MenuBarPanelManager`, starts `CompanionManager`, calls `LicenseManager.shared.hydrateFromCache()` |
+| `CompanionManager.swift` | ~1050 | State machine. Owns shortcut monitoring, overlay, and the preflight → proxied Gemini Live pipeline. Hooks on `LicenseManager.preflightSession()` before each connect |
+| `GeminiLiveSession.swift` | ~475 | Opens the WebSocket to the Worker Durable Object (not directly to Google) using `Bearer <session_token>`. Handles `atayiServerEvent.blocked` frames |
+| `LicenseManager.swift` | ~330 | `/api/license/activate`, `/status`, `/session/preflight` client. Stores the device JWT in Keychain. Publishes `LicenseState` for the UI |
+| `DeviceFingerprint.swift` | ~75 | Reads `IOPlatformUUID` via IOKit, hashes with SHA-256. Also exposes device name, OS version, app version |
+| `KeychainHelper.swift` | ~100 | Thin `SecItem*` wrapper for storing the device JWT with access control `.whenUnlockedThisDeviceOnly` |
+| `LicenseActivationView.swift` | ~160 | Panel view shown when no license is cached: paste code, activate, show errors. Also links to the landing page trial |
+| `SubscriptionStatusView.swift` | ~200 | Panel chip showing plan + credits used / allowance + daily usage + manage button |
+| `BuddyPushToTalkShortcut.swift` | ~50 | Minimal `ctrl+option` shortcut transition detection via `CGEventType` |
+| `GlobalPushToTalkShortcutMonitor.swift` | ~130 | System-wide listen-only `CGEvent` tap, publishes press/release |
+| `BuddyAudioConversionSupport.swift` | ~70 | `BuddyPCM16AudioConverter`: mic buffer → PCM16 mono 16 kHz |
+| `MenuBarPanelManager.swift` | ~245 | `NSStatusItem` + borderless `NSPanel` lifecycle |
+| `CompanionPanelView.swift` | ~800 | Panel content: conditionally renders `LicenseActivationView` or the regular companion UI + `SubscriptionStatusView` |
+| `OverlayWindow.swift` | ~880 | Full-screen transparent cursor overlay |
+| `CompanionResponseOverlay.swift` | ~220 | Response text bubble + waveform shown next to the cursor |
+| `CompanionScreenCaptureUtility.swift` | ~130 | Multi-monitor screenshot capture via ScreenCaptureKit |
+| `ElementLocationDetector.swift` | ~335 | Screenshot → element location for cursor pointing |
+| `DesignSystem.swift` | ~880 | Colors, corner radii, shared styles (`DS.Colors.*`) |
+| `ClickyAnalytics.swift` | ~121 | PostHog integration |
+| `WindowPositionManager.swift` | ~260 | Permission helpers (accessibility, screen recording) |
+| `AppBundleConfiguration.swift` | ~28 | Runtime config reader (Info.plist → string value) |
+
+### Cloudflare Worker (`worker/src/`)
+
+| File | Purpose |
+|---|---|
+| `index.ts` | Router + `scheduled()` cron handler |
+| `types.ts` | `Env` interface, DB types, `Plan` enum, `PLAN_LIMITS` |
+| `db/supabase.ts` | Typed PostgREST client (users, subscriptions, devices, sessions, RPC, admin) |
+| `auth/jwt.ts` | HS256 sign/verify using Web Crypto |
+| `auth/password.ts` | PBKDF2-SHA256 hash/verify (100k iterations — Cloudflare Workers Web Crypto cap) |
+| `lib/credit-accounting.ts` | `tokensToCredits`, `audioBytesToTokens`, `tokensToUSDCost` |
+| `lib/license-code.ts` | `generateLicenseCode`, `normalizeLicenseCode` |
+| `lib/stripe-helpers.ts` | `createCheckoutSession`, `retrieveSubscription`, `verifyStripeWebhookSignature` |
+| `lib/response.ts` | `jsonResponse`, `errorResponse`, CORS |
+| `routes/trial.ts` | Trial signup flow |
+| `routes/license.ts` | Activate + status |
+| `routes/billing.ts` | Stripe checkout + webhook + session retrieval |
+| `routes/session.ts` | Preflight endpoint |
+| `routes/landing.ts` | Analytics events + cron stats refresh |
+| `routes/admin.ts` | Admin dashboard endpoints |
+| `do/gemini-session.ts` | `GeminiSessionDO` Durable Object — the Gemini Live WebSocket proxy |
+
+### Landing page (`Landing/`)
+
+| File | Purpose |
+|---|---|
+| `index.html` | Existing marketing page + `js/main.js` plan chooser modal wiring |
+| `trial.html` | Email → trial signup → display license code with copy button |
+| `checkout-success.html` | Stripe redirect: retrieve session, display code (copy-once warning) |
+| `checkout-cancel.html` | "Payment cancelled" + fallback CTAs |
+| `account.html` | Subscription management placeholder |
+| `admin-login.html` | Password gate → admin JWT |
+| `admin.html` | Dashboard: stats tiles, user list with filters, per-user drawer |
+| `js/api.js` | Fetch wrapper around `/api/*` |
+| `js/main.js` | Plan chooser modal + download wiring |
+| `js/admin.js` | Admin dashboard logic |
+| `js/shared-styles.js` | Injected CSS for trial / success / admin pages |
+
+### Infra (`infra/supabase/`, `scripts/`)
+
+| File | Purpose |
+|---|---|
+| `infra/supabase/schema.sql` | Full Postgres schema — idempotent, runnable in the SQL editor |
+| `scripts/release.sh` | macOS archive → export → DMG pipeline. Modes: `unsigned` (default) / `developer-id` / `clean` |
+
+## Build & run
 
 ```bash
 # Open in Xcode
 open leanring-buddy.xcodeproj
 
 # Select the leanring-buddy scheme, set signing team, Cmd+R to build and run
-
-# Known non-blocking warnings: Swift 6 concurrency warnings,
-# deprecated onChange warning in OverlayWindow.swift. Do NOT attempt to fix these.
 ```
 
-**Do NOT run `xcodebuild` from the terminal** — it invalidates TCC (Transparency, Consent, and Control) permissions and the app will need to re-request screen recording, accessibility, etc.
+**Known non-blocking warnings**: Swift 6 concurrency warnings, deprecated `onChange` warning in `OverlayWindow.swift`. Do NOT attempt to fix these.
 
-## Cloudflare Worker
+**Do NOT run `xcodebuild` from the terminal during development** — it can invalidate TCC (screen recording, accessibility, microphone) grants and force the user to re-approve them. For distribution builds only, use `./scripts/release.sh`.
+
+## Release pipeline
+
+```bash
+./scripts/release.sh               # unsigned DMG for alpha/beta (no Apple Developer Program required)
+./scripts/release.sh developer-id  # signed + notarized DMG for public release
+./scripts/release.sh clean         # wipe build/ directory
+```
+
+Unsigned DMGs work for testers who right-click → Open the first time. Once the Apple Developer Program enrollment completes and a `Developer ID Application` cert is installed, rerun with `developer-id` for a Gatekeeper-friendly build.
+
+## Cloudflare Worker deployment
 
 ```bash
 cd worker
 npm install
-
-# Add secret
-npx wrangler secret put GEMINI_API_KEY
-
-# Deploy
 npx wrangler deploy
-
-# Local dev (create worker/.dev.vars with your keys)
-npx wrangler dev
 ```
 
-## Code Style & Conventions
+Secrets (push via `wrangler secret put`):
+- `GEMINI_API_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `JWT_SIGNING_SECRET` (32 random bytes base64)
+- `ADMIN_PASSWORD_HASH` (PBKDF2 format: `iterations.saltHex.hashHex`)
 
-### Variable and Method Naming
+## Cloudflare Pages deployment
 
-IMPORTANT: Follow these naming rules strictly. Clarity is the top priority.
+```bash
+cd worker
+npx wrangler pages deploy ../Landing --project-name atayi-sensei --branch main
+```
 
-- Be as clear and specific with variable and method names as possible
-- **Optimize for clarity over concision.** A developer with zero context on the codebase should immediately understand what a variable or method does just from reading its name
+The page is live at `https://atayi-sensei.pages.dev/`.
+
+## Code style & conventions
+
+### Variable and method naming
+
+- Be as clear and specific as possible
+- **Optimize for clarity over concision.** A developer with zero context should understand what a variable or method does from its name alone
 - Use longer names when it improves clarity. Do NOT use single-character variable names
-- Example: use `originalQuestionLastAnsweredDate` instead of `originalAnswered`
-- When passing props or arguments to functions, keep the same names as the original variable. Do not shorten or abbreviate parameter names. If you have `currentCardData`, pass it as `currentCardData`, not `card` or `cardData`
+- When passing props or arguments, keep the same names — do not shorten or abbreviate
 
-### Code Clarity
+### Code clarity
 
 - **Clear is better than clever.** Do not write functionality in fewer lines if it makes the code harder to understand
-- Write more lines of code if additional lines improve readability and comprehension
-- Make things so clear that someone with zero context would completely understand the variable names, method names, what things do, and why they exist
-- When a variable or method name alone cannot fully explain something, add a comment explaining what is happening and why
+- Comments explain "why" not "what", especially for non-obvious AppKit bridging or worker edge cases
 
-### Swift/SwiftUI Conventions
+### Swift / SwiftUI
 
-- Use SwiftUI for all UI unless a feature is only supported in AppKit (e.g., `NSPanel` for floating windows)
+- Use SwiftUI unless a feature is only supported in AppKit (e.g., `NSPanel` for floating windows)
 - All UI state updates must be on `@MainActor`
 - Use async/await for all asynchronous operations
-- Comments should explain "why" not just "what", especially for non-obvious AppKit bridging
-- AppKit `NSPanel`/`NSWindow` bridged into SwiftUI via `NSHostingView`
+- AppKit `NSPanel` / `NSWindow` bridged into SwiftUI via `NSHostingView`
 - All buttons must show a pointer cursor on hover
-- For any interactive element, explicitly think through its hover behavior (cursor, visual feedback, and whether hover should communicate clickability)
+
+### TypeScript (Worker)
+
+- No external npm dependencies beyond `@cloudflare/workers-types` — everything via fetch() and Web Crypto
+- No classes outside of Durable Objects — prefer pure functions
+- All responses go through `jsonResponse` / `errorResponse` for consistent CORS and error shapes
 
 ### Do NOT
 
 - Do not add features, refactor code, or make "improvements" beyond what was asked
 - Do not add docstrings, comments, or type annotations to code you did not change
-- Do not try to fix the known non-blocking warnings (Swift 6 concurrency, deprecated onChange)
-- Do not rename the project directory or scheme (the "leanring" typo is intentional/legacy)
-- Do not run `xcodebuild` from the terminal — it invalidates TCC permissions
+- Do not try to fix the known non-blocking Swift 6 warnings
+- Do not rename the project directory or scheme (the "leanring" typo is intentional/legacy — renaming breaks DerivedData and the Xcode file system synchronized groups)
+- Do not run `xcodebuild` from the terminal during dev
+- Do not expose the Supabase service_role key anywhere client-side
+- Do not ship any API key in the Swift binary — everything goes through the Worker
 
-## Git Workflow
+## Git workflow
 
 - Branch naming: `feature/description` or `fix/description`
-- Commit messages: imperative mood, concise, explain the "why" not the "what"
+- Commit messages: imperative mood, concise, explain the "why"
 - Do not force-push to main
 
-## Self-Update Instructions
+## Self-update instructions
 
 <!-- AI agents: follow these instructions to keep this file accurate. -->
 
-When you make changes to this project that affect the information in this file, update this file to reflect those changes. Specifically:
+When you make changes that affect the information in this file, update it:
 
-1. **New files**: Add new source files to the "Key Files" table with their purpose and approximate line count
-2. **Deleted files**: Remove entries for files that no longer exist
-3. **Architecture changes**: Update the architecture section if you introduce new patterns, frameworks, or significant structural changes
-4. **Build changes**: Update build commands if the build process changes
-5. **New conventions**: If the user establishes a new coding convention during a session, add it to the appropriate conventions section
-6. **Line count drift**: If a file's line count changes significantly (>50 lines), update the approximate count in the Key Files table
+1. **New files**: Add to the appropriate "Key files" table with purpose and approximate line count
+2. **Deleted files**: Remove the entry
+3. **Architecture changes**: Update the Architecture section
+4. **New Worker routes**: Add to the routes table
+5. **Schema changes**: Update the Supabase schema section
+6. **New conventions**: Add to the Code style section
 
-Do NOT update this file for minor edits, bug fixes, or changes that don't affect the documented architecture or conventions.
+Do NOT update for minor edits, bug fixes, or changes that don't affect documented architecture or conventions.

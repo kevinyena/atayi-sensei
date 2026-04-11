@@ -1,276 +1,236 @@
 #!/bin/bash
 set -euo pipefail
 
-# Add Homebrew to PATH so create-dmg and gh are available in non-interactive shells
-export PATH="/opt/homebrew/bin:$PATH"
+# Add Homebrew to PATH so create-dmg / xcodebuild / codesign are found in
+# non-interactive shells.
+export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
 # =============================================================================
-# release.sh — Automates the full release pipeline for makesomething
+# release.sh — Atayi Sensei macOS distribution pipeline
 #
-# What it does (in order):
-#   1. Auto-detects version + build from the latest GitHub Release
-#   2. Archives the app via xcodebuild
-#   3. Exports a signed + notarized .app
-#   4. Wraps it in a DMG with the drag-to-Applications background
-#   5. Notarizes the DMG with Apple (so Gatekeeper won't block it)
-#   6. Signs the DMG with your Sparkle EdDSA key
-#   7. Generates/updates appcast.xml automatically
-#   8. Creates a GitHub Release with the DMG attached
-#   9. Pushes the updated appcast.xml to the releases repo (makesomething-mac-app)
+# Three build modes:
+#   - `./scripts/release.sh`                → build unsigned DMG (default for
+#                                             alpha/beta without Developer ID)
+#   - `./scripts/release.sh developer-id`   → build signed + notarized DMG
+#                                             (requires Apple Developer Program)
+#   - `./scripts/release.sh clean`          → wipe the build/ directory and exit
 #
-# Usage:
-#   ./scripts/release.sh              Auto-bumps: 1.5 → 1.6, build 6 → 7
-#   ./scripts/release.sh 2.0          Sets marketing version to 2.0, auto-bumps build
-#   ./scripts/release.sh 2.0 10       Sets both marketing version and build number
+# The unsigned DMG works for local distribution to testers who know to
+# right-click → Open the first time (Gatekeeper will block double-click).
+# Once the user's Apple Developer Program enrollment completes, rerun with
+# `developer-id` to produce a notarized DMG that installs without friction.
 #
-# Prerequisites (one-time setup):
-#   - Xcode with your Developer ID signing certificate
-#   - `brew install create-dmg gh`
-#   - `gh auth login` (GitHub CLI authenticated)
-#   - Sparkle EdDSA key in your Keychain (already generated)
-#   - `xcrun notarytool store-credentials "AC_PASSWORD"` (Apple notarization credentials)
+# Outputs:
+#   - app/build/AtayiSensei.app    Exported application bundle
+#   - app/releases/Atayi-Sensei-<version>.dmg    Final DMG ready to share
+#
+# Prerequisites:
+#   - Xcode 16+ with command-line tools
+#   - `brew install create-dmg` (Homebrew)
+#   - (for developer-id mode) Apple Developer ID Application cert in Keychain
+#   - (for developer-id mode) `xcrun notarytool store-credentials "AC_PASSWORD"`
 # =============================================================================
 
-# ── Configuration ────────────────────────────────────────────────────────────
+MODE="${1:-unsigned}"
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+XCODE_PROJECT="${PROJECT_DIR}/leanring-buddy.xcodeproj"
 SCHEME="leanring-buddy"
-APP_NAME="makesomething"
-PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="${PROJECT_DIR}/build"
-ARCHIVE_PATH="${BUILD_DIR}/${APP_NAME}.xcarchive"
+ARCHIVE_PATH="${BUILD_DIR}/AtayiSensei.xcarchive"
 EXPORT_DIR="${BUILD_DIR}/export"
-DMG_OUTPUT_DIR="${BUILD_DIR}/dmg"
-RELEASES_DIR="${PROJECT_DIR}/releases"  # where generate_appcast reads DMGs from
-DMG_BACKGROUND="${PROJECT_DIR}/dmg-background.png"
+RELEASES_DIR="${PROJECT_DIR}/releases"
+APP_NAME="Clicky"  # the scheme exports as "Clicky.app" since that's the product bundle name
+DISPLAY_NAME="Atayi Sensei"
 
-GITHUB_REPO="julianjear/makesomething-mac-app"
-
-# Sparkle tools (auto-discovered from Xcode's SPM cache)
-SPARKLE_BIN=$(find ~/Library/Developer/Xcode/DerivedData/leanring-buddy*/SourcePackages/artifacts/sparkle/Sparkle/bin -maxdepth 0 2>/dev/null | head -1)
-
-if [ -z "$SPARKLE_BIN" ]; then
-    echo "❌ Sparkle tools not found. Build the project in Xcode first so SPM downloads Sparkle."
-    exit 1
-fi
-
-# ── Auto-detect version from latest GitHub Release ──────────────────────────
-# Fetches the latest release tag (e.g. "v1.5") and build number from GitHub.
-# If no arguments are provided, bumps the minor version by 0.1 and build by 1.
-# You can override either or both by passing arguments.
-
-echo "🔍 Checking latest release on GitHub..."
-
-LATEST_TAG=$(gh release view --repo "${GITHUB_REPO}" --json tagName --jq '.tagName' 2>/dev/null || echo "")
-
-if [ -n "$LATEST_TAG" ]; then
-    # Strip the "v" prefix to get the version number (e.g. "v1.5" → "1.5")
-    LATEST_VERSION="${LATEST_TAG#v}"
-
-    # Get the build number from the latest release's app bundle inside the DMG.
-    # We download just the release metadata (not the DMG) and parse the body/notes,
-    # but the simplest reliable approach is to track it from the GitHub release title
-    # or from a known incrementing sequence. We use the GitHub API to get asset info
-    # and derive the build number from the release list count.
-    LATEST_BUILD=$(gh release list --repo "${GITHUB_REPO}" --json tagName --jq 'length' 2>/dev/null || echo "0")
-
-    echo "   Latest release: ${LATEST_TAG} (build ${LATEST_BUILD})"
-else
-    LATEST_VERSION="0.0"
-    LATEST_BUILD=0
-    echo "   No previous releases found — starting from scratch"
-fi
-
-# Determine the next marketing version: bump minor by 0.1
-# e.g. "1.5" → "1.6", "2.9" → "3.0" (carries over)
-if [ $# -ge 1 ]; then
-    MARKETING_VERSION="$1"
-else
-    MAJOR=$(echo "$LATEST_VERSION" | cut -d. -f1)
-    MINOR=$(echo "$LATEST_VERSION" | cut -d. -f2)
-    NEXT_MINOR=$((MINOR + 1))
-    if [ "$NEXT_MINOR" -ge 10 ]; then
-        MAJOR=$((MAJOR + 1))
-        NEXT_MINOR=0
-    fi
-    MARKETING_VERSION="${MAJOR}.${NEXT_MINOR}"
-fi
-
-# Determine the next build number: always increment by 1
-if [ $# -ge 2 ]; then
-    BUILD_NUMBER="$2"
-else
-    BUILD_NUMBER=$((LATEST_BUILD + 1))
-fi
-
-DMG_FILENAME="${APP_NAME}.dmg"
-TAG="v${MARKETING_VERSION}"
-
-# ── Safety checks ────────────────────────────────────────────────────────────
-
-# Check if this tag already exists on GitHub to prevent accidental duplicates
-if gh release view "${TAG}" --repo "${GITHUB_REPO}" &>/dev/null; then
-    echo ""
-    echo "❌ Release ${TAG} already exists on GitHub!"
-    echo "   https://github.com/${GITHUB_REPO}/releases/tag/${TAG}"
-    echo ""
-    echo "   To release a new version, either:"
-    echo "     • Run without arguments to auto-bump: ./scripts/release.sh"
-    echo "     • Specify a higher version: ./scripts/release.sh $(echo "${MARKETING_VERSION} + 0.1" | bc)"
-    echo "     • Delete the existing release first: gh release delete ${TAG} --repo ${GITHUB_REPO} --yes"
-    exit 1
-fi
-
-echo ""
-echo "🚀 Releasing ${APP_NAME} v${MARKETING_VERSION} (build ${BUILD_NUMBER})"
-echo "   Previous: ${LATEST_TAG:-none}"
-echo ""
-
-# Confirm with the user before proceeding
-read -p "   Proceed? (y/N) " -n 1 -r
-echo ""
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "   Aborted."
+if [ "${MODE}" = "clean" ]; then
+    echo "🧹 Cleaning build directory…"
+    rm -rf "${BUILD_DIR}"
+    echo "✅ Done."
     exit 0
 fi
+
+mkdir -p "${BUILD_DIR}" "${EXPORT_DIR}" "${RELEASES_DIR}"
+
+# ── Version detection ───────────────────────────────────────────────────────
+# Read MARKETING_VERSION from the Release config in project.pbxproj.
+# Bump the build number automatically based on the Release CURRENT_PROJECT_VERSION.
+
+MARKETING_VERSION=$(awk '/MARKETING_VERSION = / { gsub(/[;,]/, "", $3); print $3; exit }' "${XCODE_PROJECT}/project.pbxproj")
+MARKETING_VERSION="${MARKETING_VERSION:-0.1.0}"
+BUILD_NUMBER=$(date +%Y%m%d%H%M)
+
+echo "📦 ${DISPLAY_NAME} v${MARKETING_VERSION} build ${BUILD_NUMBER} (${MODE})"
 echo ""
 
-# ── Step 1: Clean build directory ────────────────────────────────────────────
+# ── Step 1: Archive ─────────────────────────────────────────────────────────
 
-echo "🧹 Cleaning build directory and stale DMGs..."
-rm -rf "${BUILD_DIR}"
-# Remove any leftover temp DMGs from create-dmg (rw.*.dmg) and the previous
-# same-named DMG so create-dmg and generate_appcast don't choke on duplicates.
-rm -f "${RELEASES_DIR}"/rw.*.dmg "${RELEASES_DIR}/${DMG_FILENAME}"
-mkdir -p "${BUILD_DIR}" "${EXPORT_DIR}" "${DMG_OUTPUT_DIR}" "${RELEASES_DIR}"
+echo "📥 [1/4] Archiving…"
+rm -rf "${ARCHIVE_PATH}"
 
-# ── Step 2: Archive ──────────────────────────────────────────────────────────
+if [ "${MODE}" = "developer-id" ]; then
+    # Full Developer ID signing path. Requires paid Apple Developer Program.
+    xcodebuild archive \
+        -project "${XCODE_PROJECT}" \
+        -scheme "${SCHEME}" \
+        -configuration Release \
+        -archivePath "${ARCHIVE_PATH}" \
+        -destination "generic/platform=macOS" \
+        CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
+        MARKETING_VERSION="${MARKETING_VERSION}" \
+        CODE_SIGN_STYLE=Automatic
+else
+    # Unsigned-ish build: we let Xcode apply its default ad-hoc signing.
+    # The installed Apple Development cert is enough for the archive step;
+    # the resulting .app will work on the developer's own Mac and can be
+    # zipped/dmg'd for manual distribution to testers.
+    xcodebuild archive \
+        -project "${XCODE_PROJECT}" \
+        -scheme "${SCHEME}" \
+        -configuration Release \
+        -archivePath "${ARCHIVE_PATH}" \
+        -destination "generic/platform=macOS" \
+        CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
+        MARKETING_VERSION="${MARKETING_VERSION}"
+fi
 
-echo "📦 Archiving..."
-xcodebuild archive \
-    -scheme "${SCHEME}" \
-    -archivePath "${ARCHIVE_PATH}" \
-    MARKETING_VERSION="${MARKETING_VERSION}" \
-    CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
-    2>&1 | tail -5
+echo "    ✅ Archive at ${ARCHIVE_PATH}"
 
-echo "✅ Archive created"
+# ── Step 2: Export .app ─────────────────────────────────────────────────────
 
-# ── Step 3: Export (signed + notarized) ──────────────────────────────────────
+echo "📤 [2/4] Exporting .app…"
+rm -rf "${EXPORT_DIR}"
+mkdir -p "${EXPORT_DIR}"
 
-# Create an export options plist for Developer ID distribution.
-# This tells xcodebuild to sign with your Developer ID certificate
-# and submit to Apple for notarization automatically.
-EXPORT_OPTIONS="${BUILD_DIR}/ExportOptions.plist"
-cat > "${EXPORT_OPTIONS}" << 'PLIST'
+# Write a throwaway exportOptions.plist matching the build mode.
+EXPORT_OPTIONS="${BUILD_DIR}/exportOptions.plist"
+if [ "${MODE}" = "developer-id" ]; then
+cat > "${EXPORT_OPTIONS}" << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>method</key>
     <string>developer-id</string>
-    <key>destination</key>
-    <string>export</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
 </dict>
 </plist>
-PLIST
+EOF
+else
+    # Xcode 15+ accepts "mac-application" for unsigned / development exports.
+cat > "${EXPORT_OPTIONS}" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>mac-application</string>
+</dict>
+</plist>
+EOF
+fi
 
-echo "📤 Exporting (signing + notarizing — this may take a few minutes)..."
 xcodebuild -exportArchive \
     -archivePath "${ARCHIVE_PATH}" \
     -exportPath "${EXPORT_DIR}" \
-    -exportOptionsPlist "${EXPORT_OPTIONS}" \
-    2>&1 | tail -5
+    -exportOptionsPlist "${EXPORT_OPTIONS}"
 
-echo "✅ Export complete (signed + notarized)"
+EXPORTED_APP="${EXPORT_DIR}/${APP_NAME}.app"
+if [ ! -d "${EXPORTED_APP}" ]; then
+    echo "❌ Expected .app at ${EXPORTED_APP} not found. Contents of export dir:"
+    ls -la "${EXPORT_DIR}"
+    exit 1
+fi
 
-# ── Step 4: Create DMG ──────────────────────────────────────────────────────
+# Rename "Clicky.app" to "Atayi Sensei.app" on disk for user clarity
+FINAL_APP="${EXPORT_DIR}/${DISPLAY_NAME}.app"
+if [ ! -d "${FINAL_APP}" ]; then
+    mv "${EXPORTED_APP}" "${FINAL_APP}"
+fi
 
-DMG_PATH="${RELEASES_DIR}/${DMG_FILENAME}"
+echo "    ✅ Exported to ${FINAL_APP}"
 
-echo "💿 Creating DMG..."
-create-dmg \
-    --volname "${APP_NAME}" \
-    --window-pos 200 120 \
-    --window-size 660 400 \
-    --icon-size 100 \
-    --icon "${APP_NAME}.app" 160 195 \
-    --app-drop-link 500 195 \
-    --background "${DMG_BACKGROUND}" \
-    "${DMG_PATH}" \
-    "${EXPORT_DIR}/${APP_NAME}.app" \
-    2>&1 | tail -3
+# ── Step 3 (developer-id only): Notarize ────────────────────────────────────
 
-echo "✅ DMG created: ${DMG_PATH}"
+if [ "${MODE}" = "developer-id" ]; then
+    echo "🔏 [3/4] Notarizing with Apple (this takes 2-5 minutes)…"
+    NOTARIZE_ZIP="${BUILD_DIR}/AtayiSensei-notarize.zip"
+    rm -f "${NOTARIZE_ZIP}"
+    ditto -c -k --keepParent "${FINAL_APP}" "${NOTARIZE_ZIP}"
 
-# ── Step 5: Notarize the DMG ─────────────────────────────────────────────────
-# The .app inside the DMG is already signed with Developer ID, but the DMG
-# itself needs to be submitted to Apple for notarization so Gatekeeper
-# allows users to open it without the "Apple could not verify" warning.
-# Requires stored credentials: xcrun notarytool store-credentials "AC_PASSWORD"
+    xcrun notarytool submit "${NOTARIZE_ZIP}" \
+        --keychain-profile "AC_PASSWORD" \
+        --wait
 
-echo "🔏 Notarizing DMG with Apple (this may take a few minutes)..."
-xcrun notarytool submit "${DMG_PATH}" \
-    --keychain-profile "AC_PASSWORD" \
-    --wait
+    xcrun stapler staple "${FINAL_APP}"
+    echo "    ✅ Notarized + stapled"
+else
+    echo "⏭️  [3/4] Skipping notarization (unsigned mode)"
+fi
 
-echo "📎 Stapling notarization ticket to DMG..."
-xcrun stapler staple "${DMG_PATH}"
+# ── Step 4: Build DMG ───────────────────────────────────────────────────────
 
-echo "✅ DMG notarized and stapled"
+echo "📀 [4/4] Building DMG…"
+DMG_NAME="Atayi-Sensei-${MARKETING_VERSION}.dmg"
+DMG_PATH="${RELEASES_DIR}/${DMG_NAME}"
+rm -f "${DMG_PATH}"
 
-# ── Step 6: Sign DMG with Sparkle EdDSA key ─────────────────────────────────
+# Generate a .icns volume icon from the MYE4a image asset (Atayi Sensei logo)
+# so the mounted DMG shows the branded icon in Finder.
+ICON_SOURCE="${PROJECT_DIR}/leanring-buddy/Assets.xcassets/MYE4a.imageset/MYE4a.jpg"
+ICON_WORK_DIR="${BUILD_DIR}/icon"
+ICONSET="${ICON_WORK_DIR}/AtayiSensei.iconset"
+VOLUME_ICNS="${ICON_WORK_DIR}/AtayiSensei.icns"
+if [ -f "${ICON_SOURCE}" ]; then
+    rm -rf "${ICONSET}"
+    mkdir -p "${ICONSET}"
+    for ICON_SIZE in 16 32 64 128 256 512; do
+        HD_SIZE=$((ICON_SIZE * 2))
+        sips -z ${ICON_SIZE} ${ICON_SIZE} "${ICON_SOURCE}" --out "${ICONSET}/icon_${ICON_SIZE}x${ICON_SIZE}.png" > /dev/null 2>&1
+        sips -z ${HD_SIZE} ${HD_SIZE} "${ICON_SOURCE}" --out "${ICONSET}/icon_${ICON_SIZE}x${ICON_SIZE}@2x.png" > /dev/null 2>&1
+    done
+    iconutil -c icns "${ICONSET}" -o "${VOLUME_ICNS}"
+    echo "    🎨 Generated ${VOLUME_ICNS} from MYE4a.jpg"
+fi
 
-echo "🔐 Signing DMG with Sparkle EdDSA key..."
-"${SPARKLE_BIN}/sign_update" "${DMG_PATH}"
+DMG_OPTIONS=(
+    --volname "${DISPLAY_NAME}"
+    --window-pos 200 120
+    --window-size 600 400
+    --icon-size 100
+    --icon "${DISPLAY_NAME}.app" 150 180
+    --hide-extension "${DISPLAY_NAME}.app"
+    --app-drop-link 450 180
+    --no-internet-enable
+)
 
-# ── Step 7: Generate / update appcast.xml ────────────────────────────────────
-# generate_appcast reads all DMGs in the releases/ directory, extracts version
-# info from the app bundle inside each DMG, signs with your EdDSA key, and
-# produces appcast.xml. The --download-url-prefix tells it where users will
-# actually download the DMG from (GitHub Releases).
+if [ -f "${VOLUME_ICNS}" ]; then
+    DMG_OPTIONS+=(--volicon "${VOLUME_ICNS}")
+fi
 
-echo "📡 Generating appcast.xml..."
-"${SPARKLE_BIN}/generate_appcast" \
-    --download-url-prefix "https://github.com/${GITHUB_REPO}/releases/download/${TAG}/" \
-    -o "${PROJECT_DIR}/appcast.xml" \
-    "${RELEASES_DIR}"
+if [ -f "${PROJECT_DIR}/dmg-background.png" ]; then
+    DMG_OPTIONS+=(--background "${PROJECT_DIR}/dmg-background.png")
+fi
 
-echo "✅ appcast.xml updated"
-
-# ── Step 8: Create GitHub Release ────────────────────────────────────────────
-# Create the release first so the DMG download URL is live before we push the
-# appcast that references it.
-
-echo "🏷️  Creating GitHub Release ${TAG}..."
-gh release create "${TAG}" "${DMG_PATH}" \
-    --repo "${GITHUB_REPO}" \
-    --title "v${MARKETING_VERSION}" \
-    --notes "makesomething v${MARKETING_VERSION}" \
-    --latest
-
-# ── Step 9: Push appcast.xml to the releases repo ───────────────────────────
-# The appcast lives in makesomething-mac-app (the releases repo), not in the
-# source code repo. We clone it to a temp dir, copy the new appcast, and push.
-
-echo "📝 Pushing appcast.xml to ${GITHUB_REPO}..."
-RELEASES_REPO_DIR=$(mktemp -d)
-git clone --depth 1 "https://github.com/${GITHUB_REPO}.git" "${RELEASES_REPO_DIR}" 2>&1 | tail -2
-cp "${PROJECT_DIR}/appcast.xml" "${RELEASES_REPO_DIR}/appcast.xml"
-cd "${RELEASES_REPO_DIR}"
-git add appcast.xml
-git commit -m "Update appcast.xml for v${MARKETING_VERSION}" || echo "   (no changes to commit)"
-git push || echo "   (push failed — you may need to push manually)"
-cd "${PROJECT_DIR}"
-rm -rf "${RELEASES_REPO_DIR}"
+create-dmg "${DMG_OPTIONS[@]}" "${DMG_PATH}" "${FINAL_APP}"
 
 echo ""
-echo "═══════════════════════════════════════════════════════════════"
-echo "✅ Release v${MARKETING_VERSION} (build ${BUILD_NUMBER}) complete!"
+echo "🎉 ${DISPLAY_NAME} v${MARKETING_VERSION} DMG ready:"
+echo "    ${DMG_PATH}"
 echo ""
-echo "   DMG:      ${DMG_PATH}"
-echo "   Appcast:  ${PROJECT_DIR}/appcast.xml"
-echo "   Release:  https://github.com/${GITHUB_REPO}/releases/tag/${TAG}"
-echo ""
-echo "   Download URL (always latest):"
-echo "   https://github.com/${GITHUB_REPO}/releases/latest/download/${DMG_FILENAME}"
-echo "═══════════════════════════════════════════════════════════════"
+
+if [ "${MODE}" != "developer-id" ]; then
+    echo "⚠️  This DMG is NOT signed with Developer ID + notarized."
+    echo "   Testers will need to right-click → Open the first time they"
+    echo "   launch the app (Gatekeeper will otherwise say 'cannot be opened')."
+    echo ""
+    echo "   When your Apple Developer Program enrollment is active and you"
+    echo "   have a 'Developer ID Application' cert in Keychain, rerun with:"
+    echo "       ./scripts/release.sh developer-id"
+    echo ""
+fi
+
+echo "Upload to Cloudflare R2 when ready:"
+echo "    cd worker && npx wrangler r2 object put atayi-downloads/${DMG_NAME} --file ${DMG_PATH}"
