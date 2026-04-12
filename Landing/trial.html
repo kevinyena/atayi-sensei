@@ -57,8 +57,7 @@
     <a class="atayi-btn secondary" href="/downloads/Atayi-Sensei-1.0.dmg" id="downloadAppLink" download>Download Atayi Sensei for macOS</a>
 
     <p class="atayi-muted">
-      Trial expires in 7 days. <a href="/">Upgrade anytime</a>.<br/>
-      On first launch, right-click the app → Open → Open to bypass Gatekeeper (unsigned build).
+      Trial expires in 7 days. <a href="/">Upgrade anytime</a>.
     </p>
   </div>
 
@@ -77,9 +76,17 @@
     const licenseCodeDisplay = document.getElementById("licenseCodeDisplay");
     const copyCodeButton = document.getElementById("copyCodeButton");
 
-    // Check for ?plan=starter|ultra query param to redirect straight to checkout
-    // after the email is submitted (upgrade-from-trial-to-paid flow).
     const queryParams = new URLSearchParams(window.location.search);
+
+    // Platform-aware download link (mac vs windows)
+    const requestedPlatform = queryParams.get("platform") || "mac";
+    const downloadLink = document.getElementById("downloadAppLink");
+    if (requestedPlatform === "windows") {
+      downloadLink.href = "https://github.com/kevinyena/atayi-sensei/releases/download/v1.0.0/Atayi.Sensei.exe";
+      downloadLink.textContent = "Download Atayi Sensei for Windows";
+    }
+
+    // Check for ?plan=starter|ultra query param to redirect straight to checkout
     const requestedPlan = queryParams.get("plan");
     if (requestedPlan === "starter" || requestedPlan === "ultra") {
       document.querySelector("#signupCard h1").textContent =

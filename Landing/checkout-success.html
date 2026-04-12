@@ -41,7 +41,7 @@
 
     <div style="height: 12px;"></div>
 
-    <a class="atayi-btn secondary" href="/downloads/Atayi-Sensei-1.0.dmg" id="downloadLink" download>Download Atayi Sensei for macOS</a>
+    <a class="atayi-btn secondary" href="/downloads/Atayi-Sensei-1.0.dmg" id="downloadLink" download>Download Atayi Sensei</a>
 
     <p class="atayi-muted" id="planDetails"></p>
     <p class="atayi-muted" style="margin-top:6px;">
@@ -72,6 +72,16 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     const stripeSessionId = urlParams.get("session_id");
+
+    // Auto-detect platform from user agent for the download link
+    const isWindows = navigator.userAgent.includes("Windows");
+    const downloadLinkElement = document.getElementById("downloadLink");
+    if (isWindows && downloadLinkElement) {
+      downloadLinkElement.href = "https://github.com/kevinyena/atayi-sensei/releases/download/v1.0.0/Atayi.Sensei.exe";
+      downloadLinkElement.textContent = "Download Atayi Sensei for Windows";
+    } else if (downloadLinkElement) {
+      downloadLinkElement.textContent = "Download Atayi Sensei for macOS";
+    }
 
     if (!stripeSessionId) {
       loadingCard.style.display = "none";

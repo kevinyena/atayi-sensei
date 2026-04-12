@@ -5,6 +5,10 @@
 
 import { api } from "./api.js";
 
+// Tracks which platform the user clicked ("mac" or "windows") so the
+// trial/checkout-success page can show the right download link.
+let selectedPlatform = "mac";
+
 // Track the landing page view immediately on load.
 api.trackEvent("page_view", "index").catch(() => {
   // Non-blocking — analytics failures shouldn't break the page.
@@ -183,10 +187,12 @@ function closePlanChooserModal() {
 }
 
 async function handlePlanSelection(planKey) {
-  api.trackEvent("download_click", "index", { plan: planKey }).catch(() => {});
+  api.trackEvent("download_click", "index", { plan: planKey, platform: selectedPlatform }).catch(() => {});
+
+  const platformParam = `platform=${selectedPlatform}`;
 
   if (planKey === "trial") {
-    window.location.href = "/trial.html";
+    window.location.href = `/trial.html?${platformParam}`;
     return;
   }
 
@@ -196,7 +202,7 @@ async function handlePlanSelection(planKey) {
   const heroEmailInput = document.getElementById("emailInput");
   const enteredEmail = heroEmailInput?.value.trim();
   if (!enteredEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(enteredEmail)) {
-    window.location.href = `/trial.html?plan=${planKey}`;
+    window.location.href = `/trial.html?plan=${planKey}&${platformParam}`;
     return;
   }
 
@@ -223,13 +229,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Wire Windows download to the GitHub Release asset (157 MB, too large for Pages)
+  // Wire Windows download to the same plan-chooser modal as Mac.
+  // The .exe is already configured to accept license codes and talk to the Worker.
+  // After trial/payment, the user gets a license code (same as Mac),
+  // then downloads the EXE from GitHub Releases.
   const winDownloadButton = document.getElementById("downloadWinBtn");
   if (winDownloadButton) {
-    winDownloadButton.href = "https://github.com/kevinyena/atayi-sensei/releases/download/v1.0.0/Atayi.Sensei.exe";
-    winDownloadButton.setAttribute("download", "");
-    winDownloadButton.addEventListener("click", () => {
-      api.trackEvent("download_click", "index", { platform: "windows" }).catch(() => {});
+    winDownloadButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      selectedPlatform = "windows";
+      openPlanChooserModal();
     });
   }
 });
