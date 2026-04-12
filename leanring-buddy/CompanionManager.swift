@@ -207,21 +207,21 @@ enum SenseiLanguage: String, CaseIterable, Identifiable {
 
     var introBody: String {
         switch self {
-        case .english: return "A voice AI that lives in your menu bar and helps you build in Unreal, Unity, Blender, Premiere, AutoCAD, Sketch, and Figma."
-        case .french:  return "Une IA vocale dans ta barre de menu qui t'aide à créer sur Unreal, Unity, Blender, Premiere, AutoCAD, Sketch et Figma."
-        case .spanish: return "Una IA de voz en tu barra de menú que te ayuda a crear en Unreal, Unity, Blender, Premiere, AutoCAD, Sketch y Figma."
-        case .chinese: return "住在菜单栏里的语音 AI，帮你在 Unreal、Unity、Blender、Premiere、AutoCAD、Sketch 和 Figma 中构建项目。"
-        case .arabic:  return "ذكاء اصطناعي صوتي في شريط القوائم يساعدك في Unreal وUnity وBlender وPremiere وAutoCAD وSketch وFigma."
+        case .english: return "A voice AI that lives in your computer and helps you build cool things like games, with Unreal, Unity, Blender, Premiere, AutoCAD, and more."
+        case .french:  return "Une IA vocale qui vit dans ton ordinateur et t'aide à créer des choses cool comme des jeux, avec Unreal, Unity, Blender, Premiere, AutoCAD et plus."
+        case .spanish: return "Una IA de voz que vive en tu ordenador y te ayuda a crear cosas geniales como juegos, con Unreal, Unity, Blender, Premiere, AutoCAD y más."
+        case .chinese: return "住在你电脑里的语音 AI，帮你用 Unreal、Unity、Blender、Premiere、AutoCAD 等工具创造游戏等酷炫作品。"
+        case .arabic:  return "ذكاء اصطناعي صوتي يعيش في حاسوبك ويساعدك في بناء أشياء رائعة كالألعاب، باستخدام Unreal وUnity وBlender وPremiere وAutoCAD والمزيد."
         }
     }
 
     var introPrivacy: String {
         switch self {
-        case .english: return "Nothing runs in the background. Sensei only looks at your screen when you press the hotkey."
-        case .french:  return "Rien ne tourne en fond. Sensei ne regarde ton écran que quand tu appuies sur le raccourci."
-        case .spanish: return "Nada corre en segundo plano. Sensei solo ve tu pantalla al presionar la tecla."
-        case .chinese: return "没有后台运行。Sensei 只在你按下快捷键时查看你的屏幕。"
-        case .arabic:  return "لا شيء يعمل في الخلفية. لا يرى Sensei شاشتك إلا عند الضغط على الاختصار."
+        case .english: return "Sensei only starts looking when you press Control + Option. When you want Sensei to stop looking, listening or talking, stop him by pressing Control + Option again."
+        case .french:  return "Sensei commence à regarder uniquement quand tu appuies sur Control + Option. Pour qu'il arrête de regarder, écouter ou parler, rappuie sur Control + Option."
+        case .spanish: return "Sensei solo empieza a mirar cuando presionas Control + Option. Para que deje de mirar, escuchar o hablar, presiona Control + Option de nuevo."
+        case .chinese: return "只有按下 Control + Option 时 Sensei 才会开始观察。想让 Sensei 停止观察、聆听或说话，再按一次 Control + Option。"
+        case .arabic:  return "لا يبدأ Sensei بالمشاهدة إلا عند الضغط على Control + Option. لإيقافه عن المشاهدة أو الاستماع أو التحدث، اضغط Control + Option مرة أخرى."
         }
     }
 
@@ -449,7 +449,7 @@ final class CompanionManager: ObservableObject {
         ClickyAnalytics.trackOnboardingStarted()
 
         // Play Besaid theme at 60% volume, fade out after 1m 30s
-        startOnboardingMusic()
+        // Music removed — was playing Besaid theme during onboarding
 
         // Show the overlay for the first time — isFirstAppearance triggers
         // the welcome animation and onboarding video
@@ -463,7 +463,7 @@ final class CompanionManager: ObservableObject {
     func replayOnboarding() {
         NotificationCenter.default.post(name: .clickyDismissPanel, object: nil)
         ClickyAnalytics.trackOnboardingReplayed()
-        startOnboardingMusic()
+        // Music removed — was playing Besaid theme during onboarding
         // Tear down any existing overlays and recreate with isFirstAppearance = true
         overlayWindowManager.hasShownOverlayBefore = false
         overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
