@@ -69,7 +69,7 @@ function createPlanChooserModal() {
           title: "Free trial",
           price: "7 days free",
           subtitle: "15 min / day of talk time",
-          features: ["1 Mac", "Full feature access", "No credit card"],
+          features: [selectedPlatform === "windows" ? "1 PC" : "1 Mac", "Full feature access", "No credit card"],
           ctaLabel: "Start free trial",
           accent: "#3b82f6",
         })}
@@ -79,7 +79,7 @@ function createPlanChooserModal() {
           price: "$19",
           period: "/ month",
           subtitle: "~11 hours of talk time",
-          features: ["1 Mac", "40 000 Atayi credits / month", "Cancel anytime"],
+          features: [selectedPlatform === "windows" ? "1 PC" : "1 Mac", "40 000 Atayi credits / month", "Cancel anytime"],
           ctaLabel: "Choose Starter",
           accent: "#eab308",
         })}
@@ -89,7 +89,7 @@ function createPlanChooserModal() {
           price: "$49",
           period: "/ month",
           subtitle: "~44 hours of talk time",
-          features: ["Up to 3 Macs shared", "160 000 Atayi credits / month", "Priority support"],
+          features: [selectedPlatform === "windows" ? "Up to 3 PCs shared" : "Up to 3 Macs shared", "160 000 Atayi credits / month", "Priority support"],
           ctaLabel: "Choose Ultra",
           accent: "#a855f7",
           isPopular: true,
@@ -150,26 +150,28 @@ function renderPlanCard({ key, title, price, period = "", subtitle, features, ct
 }
 
 function openPlanChooserModal() {
-  let modalOverlay = document.getElementById("atayi-plan-modal");
-  if (!modalOverlay) {
-    modalOverlay = createPlanChooserModal();
-    document.body.appendChild(modalOverlay);
+  // Always recreate the modal so it reflects the current selectedPlatform
+  // (Mac vs PC labels change depending on which download button was clicked).
+  const existingModal = document.getElementById("atayi-plan-modal");
+  if (existingModal) existingModal.remove();
 
-    // Close handlers
-    modalOverlay.addEventListener("click", (event) => {
-      if (event.target === modalOverlay) closePlanChooserModal();
-    });
-    modalOverlay.querySelector("#atayi-plan-close").addEventListener("click", closePlanChooserModal);
+  const modalOverlay = createPlanChooserModal();
+  document.body.appendChild(modalOverlay);
 
-    // Plan selection handlers
-    modalOverlay.querySelectorAll(".atayi-plan-cta").forEach((button) => {
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const planKey = button.getAttribute("data-plan-key");
-        handlePlanSelection(planKey);
-      });
+  // Close handlers
+  modalOverlay.addEventListener("click", (event) => {
+    if (event.target === modalOverlay) closePlanChooserModal();
+  });
+  modalOverlay.querySelector("#atayi-plan-close").addEventListener("click", closePlanChooserModal);
+
+  // Plan selection handlers
+  modalOverlay.querySelectorAll(".atayi-plan-cta").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const planKey = button.getAttribute("data-plan-key");
+      handlePlanSelection(planKey);
     });
-  }
+  });
 
   // Fade in
   requestAnimationFrame(() => {
@@ -225,6 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (macDownloadButton) {
     macDownloadButton.addEventListener("click", (event) => {
       event.preventDefault();
+      selectedPlatform = "mac";
       openPlanChooserModal();
     });
   }
