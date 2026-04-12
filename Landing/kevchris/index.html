@@ -47,8 +47,10 @@
 
     /* Signup breakdown */
     .breakdown-table { width:100%;border-collapse:collapse;font-size:12px;margin-top:8px; }
-    .breakdown-table th { text-align:left;color:#999;font-weight:500;padding:4px 8px;border-bottom:1px solid #f0f0f0; }
-    .breakdown-table td { padding:4px 8px;border-bottom:1px solid #f0f0f0; }
+    .breakdown-table th { text-align:right;color:#999;font-weight:500;padding:6px 12px;border-bottom:1px solid #f0f0f0; }
+    .breakdown-table th:first-child { text-align:left; }
+    .breakdown-table td { padding:6px 12px;border-bottom:1px solid #f0f0f0;text-align:right;font-variant-numeric:tabular-nums; }
+    .breakdown-table td:first-child { text-align:left; }
 
     /* Filters */
     .filters { display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap; }
@@ -146,6 +148,7 @@
           <tr>
             <th>Email</th>
             <th>Plan</th>
+            <th>Platform</th>
             <th>Status</th>
             <th>Credits</th>
             <th>License</th>
@@ -317,7 +320,7 @@
 
       const tbody = document.getElementById("usersTableBody");
       if (!r.body.users || r.body.users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:24px;">No users found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#999;padding:24px;">No users found</td></tr>';
         return;
       }
 
@@ -334,11 +337,21 @@
         const statusLabel = u.is_blocked ? "Blocked" : u.is_paused ? "Paused" : u.subscription_status || "none";
 
         const licenseCode = u.license_code || "";
-        const deviceNames = (u.device_names || []).filter(n => n !== "Unknown device");
+        const deviceNames = u.device_names || [];
+        const deviceCount = deviceNames.length;
+        const deviceInfoStr = deviceNames.join(", ");
+
+        // Detect platform from device names
+        const allNames = deviceNames.join(" ").toLowerCase();
+        const isMac = allNames.includes("mac") || allNames.includes("imac") || allNames.includes("macbook");
+        const isWin = allNames.includes("desktop") || allNames.includes("windows") || allNames.includes("pc");
+        const platformIcon = isMac ? "&#63743;" : isWin ? "&#128187;" : "";
+        const platformLabel = isMac ? "Mac" : isWin ? "Win" : "-";
 
         return `<tr>
           <td><a href="#" onclick="window._openDrawer('${u.user_id}');return false;" style="color:#3b82f6;text-decoration:none;">${esc(u.email)}</a></td>
           <td><span class="plan-badge plan-${plan}">${plan}</span></td>
+          <td style="font-size:12px;text-align:center;">${platformIcon ? `<span title="${platformLabel}">${platformIcon}</span>` : '<span style="color:#ccc;">-</span>'}</td>
           <td><span class="status-dot status-${statusClass}"></span>${statusLabel}</td>
           <td>
             <div class="credits-bar"><div class="credits-fill" style="width:${pct}%;background:${planColor};"></div></div>
@@ -347,8 +360,8 @@
           <td style="text-align:center;">
             ${licenseCode ? `<button class="action-btn" onclick="navigator.clipboard.writeText('${esc(licenseCode)}');this.textContent='Copied!';setTimeout(()=>this.innerHTML='&#128203;',1500)" title="${esc(licenseCode)}" style="font-size:14px;border:none;padding:2px 6px;">&#128203;</button>` : '<span style="color:#ccc;">-</span>'}
           </td>
-          <td style="font-size:11px;color:#555;max-width:120px;">
-            ${deviceNames.length > 0 ? deviceNames.map(n => esc(n)).join('<br/>') : '<span style="color:#ccc;">-</span>'}
+          <td style="text-align:center;font-size:12px;">
+            ${deviceCount > 0 ? `<span>${deviceCount}</span> <button class="action-btn" onclick="navigator.clipboard.writeText('${esc(deviceInfoStr)}');this.textContent='Copied!';setTimeout(()=>this.innerHTML='&#128203;',1500)" title="${esc(deviceInfoStr)}" style="font-size:12px;border:none;padding:1px 4px;">&#128203;</button>` : '<span style="color:#ccc;">0</span>'}
           </td>
           <td style="font-size:12px;">$${totalCost}</td>
           <td style="white-space:nowrap;">
