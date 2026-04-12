@@ -126,6 +126,7 @@
           licenseCodeDisplay.textContent = response.body.license_code;
           signupCard.style.display = "none";
           successCard.style.display = "block";
+          autoTriggerDownload();
           return;
         }
 
@@ -134,6 +135,7 @@
           licenseCodeDisplay.textContent = response.body.license_code;
           signupCard.style.display = "none";
           successCard.style.display = "block";
+          autoTriggerDownload();
           return;
         }
 
@@ -149,6 +151,24 @@
             : "Start free trial";
       }
     });
+
+    // Auto-trigger the download 1.5s after the license code is shown,
+    // so the user sees the code first then the download starts seamlessly.
+    function autoTriggerDownload() {
+      setTimeout(() => {
+        const downloadUrl = requestedPlatform === "windows"
+          ? "https://github.com/kevinyena/atayi-sensei/releases/download/v1.0.0/Atayi.Sensei.exe"
+          : "/downloads/Atayi-Sensei-1.0.dmg";
+
+        const tempLink = document.createElement("a");
+        tempLink.href = downloadUrl;
+        tempLink.setAttribute("download", "");
+        tempLink.style.display = "none";
+        document.body.appendChild(tempLink);
+        tempLink.click();
+        document.body.removeChild(tempLink);
+      }, 1500);
+    }
 
     copyCodeButton.addEventListener("click", async () => {
       const code = licenseCodeDisplay.textContent.trim();

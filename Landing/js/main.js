@@ -198,27 +198,103 @@ async function handlePlanSelection(planKey) {
     return;
   }
 
-  // For Starter / Ultra, we need an email to create the Stripe checkout session.
-  // Grab it from the hero input if it's filled, otherwise send the user to /trial.html
-  // which has an email field.
-  const heroEmailInput = document.getElementById("emailInput");
-  const enteredEmail = heroEmailInput?.value.trim();
-  if (!enteredEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(enteredEmail)) {
-    window.location.href = `/trial.html?plan=${planKey}&${platformParam}`;
-    return;
+  // For Starter / Ultra, show an inline email input in the modal
+  // so the user doesn't leave the page. Then redirect to Stripe.
+  showEmailInputInModal(planKey);
+}
+
+function showEmailInputInModal(planKey) {
+  const modal = document.getElementById("atayi-plan-modal");
+  if (!modal) return;
+
+  const innerCard = modal.querySelector("div > div"); // the white card container
+  if (!innerCard) return;
+
+  const planLabel = planKey === "ultra" ? "Ultra ($49/mo)" : "Starter ($19/mo)";
+
+  innerCard.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 22px;">
+      <div>
+        <h2 style="margin: 0 0 6px; font-size: 22px; font-weight: 700;">Subscribe to ${planLabel}</h2>
+        <p style="margin: 0; font-size: 13px; color: rgba(255, 255, 255, 0.6);">Enter your email to proceed to payment.</p>
+      </div>
+      <button id="atayi-email-back" style="
+        background: none; border: none; color: rgba(255, 255, 255, 0.5);
+        font-size: 22px; cursor: pointer; padding: 0; width: 32px; height: 32px;
+        border-radius: 8px;
+      ">×</button>
+    </div>
+
+    <input type="email" id="atayi-checkout-email" placeholder="you@example.com" style="
+      width: 100%; background: #15171a; border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px; padding: 14px 16px; color: white; font-size: 15px;
+      outline: none; margin-bottom: 14px; box-sizing: border-box;
+    " autofocus />
+
+    <button id="atayi-checkout-submit" style="
+      width: 100%; background: ${planKey === "ultra" ? "#a855f7" : "#eab308"};
+      color: ${planKey === "ultra" ? "white" : "black"}; border: none; padding: 14px;
+      border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer;
+    ">Continue to payment</button>
+
+    <div id="atayi-checkout-error" style="
+      display: none; margin-top: 12px; background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3); border-radius: 8px;
+      padding: 10px 12px; font-size: 13px; color: #f87171;
+    "></div>
+
+    <p style="margin: 16px 0 0; font-size: 11px; color: rgba(255,255,255,0.4); text-align: center;">
+      <a href="#" id="atayi-email-back-link" style="color: #60a5fa; text-decoration: none;">← Back to plans</a>
+    </p>
+  `;
+
+  // Wire close / back
+  modal.querySelector("#atayi-email-back").addEventListener("click", closePlanChooserModal);
+  modal.querySelector("#atayi-email-back-link").addEventListener("click", (e) => {
+    e.preventDefault();
+    closePlanChooserModal();
+    setTimeout(() => openPlanChooserModal(), 300);
+  });
+
+  // Wire submit
+  const emailInput = modal.querySelector("#atayi-checkout-email");
+  const submitBtn = modal.querySelector("#atayi-checkout-submit");
+  const errorDiv = modal.querySelector("#atayi-checkout-error");
+
+  async function doCheckout() {
+    const email = emailInput.value.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errorDiv.textContent = "Please enter a valid email address.";
+      errorDiv.style.display = "block";
+      return;
+    }
+    errorDiv.style.display = "none";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Redirecting to Stripe…";
+
+    try {
+      // Store the platform in localStorage so checkout-success.html can
+      // auto-trigger the right download after payment completes.
+      localStorage.setItem("atayi_checkout_platform", selectedPlatform);
+
+      const response = await api.createCheckoutSession(planKey, email);
+      if (response.ok && response.body.checkout_url) {
+        window.location.href = response.body.checkout_url;
+      } else {
+        throw new Error(response.body.message || "Could not start checkout");
+      }
+    } catch (error) {
+      errorDiv.textContent = error.message;
+      errorDiv.style.display = "block";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Continue to payment";
+    }
   }
 
-  // Have an email → go straight to Stripe
-  try {
-    const response = await api.createCheckoutSession(planKey, enteredEmail);
-    if (response.ok && response.body.checkout_url) {
-      window.location.href = response.body.checkout_url;
-    } else {
-      alert("Could not start checkout: " + (response.body.message || "unknown error"));
-    }
-  } catch (error) {
-    alert("Network error starting checkout: " + error.message);
-  }
+  submitBtn.addEventListener("click", doCheckout);
+  emailInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doCheckout();
+  });
 }
 
 // Wire up the download button

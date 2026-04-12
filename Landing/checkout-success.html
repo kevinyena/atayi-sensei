@@ -124,6 +124,25 @@
       planDetails.innerHTML = `Plan: <strong>${plan.charAt(0).toUpperCase() + plan.slice(1)}</strong> — ${max_devices} device${max_devices > 1 ? "s" : ""} — ${monthly_allowance.toLocaleString()} credits/month`;
       loadingCard.style.display = "none";
       successCard.style.display = "block";
+
+      // Auto-trigger download after a short delay so the user sees the
+      // license code first, then the download starts in the background.
+      setTimeout(() => {
+        const savedPlatform = localStorage.getItem("atayi_checkout_platform") || (isWindows ? "windows" : "mac");
+        const autoDownloadUrl = savedPlatform === "windows"
+          ? "https://github.com/kevinyena/atayi-sensei/releases/download/v1.0.0/Atayi.Sensei.exe"
+          : "/downloads/Atayi-Sensei-1.0.dmg";
+
+        const tempLink = document.createElement("a");
+        tempLink.href = autoDownloadUrl;
+        tempLink.setAttribute("download", "");
+        tempLink.style.display = "none";
+        document.body.appendChild(tempLink);
+        tempLink.click();
+        document.body.removeChild(tempLink);
+
+        localStorage.removeItem("atayi_checkout_platform");
+      }, 1500);
     }
 
     copyCodeButton.addEventListener("click", async () => {
