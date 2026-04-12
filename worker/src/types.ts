@@ -17,6 +17,8 @@ export interface Env {
   ADMIN_PASSWORD_HASH: string; // pbkdf2 format: "iterations.saltHex.hashHex"
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
+  RESEND_API_KEY: string;
+  GOOGLE_CLIENT_ID: string;
 
   // Hardcoded Stripe price IDs for the two plans
   STRIPE_PRICE_STARTER?: string;
@@ -44,6 +46,10 @@ export interface User {
   blocked_reason: string | null;
   blocked_at: string | null;
   admin_notes: string | null;
+  password_hash: string | null;
+  auth_provider: string;
+  google_id: string | null;
+  email_verified: boolean;
 }
 
 export interface Subscription {

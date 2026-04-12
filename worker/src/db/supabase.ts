@@ -21,7 +21,7 @@ export class SupabaseClient {
     this.serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
   }
 
-  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(`${this.supabaseBaseUrl}/rest/v1${path}`, {
       ...init,
       headers: {

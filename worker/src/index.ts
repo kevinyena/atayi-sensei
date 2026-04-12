@@ -10,6 +10,14 @@
  */
 
 import { handleTrialSignup } from "./routes/trial";
+import {
+  handleSignup,
+  handleVerifyOTP,
+  handleGoogleAuth,
+  handleLogin,
+  handleResendOTP,
+  handleAccountProfile,
+} from "./routes/auth";
 import { handleLicenseActivate, handleLicenseStatus } from "./routes/license";
 import {
   handleCheckoutCreate,
@@ -54,9 +62,27 @@ export default {
         return await handleLandingEvent(request, env);
       }
 
-      // ========== Auth / trial ==========
+      // ========== Auth ==========
       if (url.pathname === "/api/auth/trial-signup" && method === "POST") {
         return await handleTrialSignup(request, env);
+      }
+      if (url.pathname === "/api/auth/signup" && method === "POST") {
+        return await handleSignup(request, env);
+      }
+      if (url.pathname === "/api/auth/verify-otp" && method === "POST") {
+        return await handleVerifyOTP(request, env);
+      }
+      if (url.pathname === "/api/auth/google" && method === "POST") {
+        return await handleGoogleAuth(request, env);
+      }
+      if (url.pathname === "/api/auth/login" && method === "POST") {
+        return await handleLogin(request, env);
+      }
+      if (url.pathname === "/api/auth/resend-otp" && method === "POST") {
+        return await handleResendOTP(request, env);
+      }
+      if (url.pathname === "/api/account/profile" && method === "GET") {
+        return await handleAccountProfile(request, env);
       }
 
       // ========== License ==========
