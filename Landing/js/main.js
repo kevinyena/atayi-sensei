@@ -1,7 +1,7 @@
 // Atayi Sensei — landing page main script.
 // Flow: Download button → Plan Chooser → Create Account (Google + email/pwd) → OTP → Stripe or Trial Success
 
-import { api } from "./api.js";
+import { api } from "./api.js?v=3";
 
 const GOOGLE_CLIENT_ID = "665011541151-pglu1e7pij41rsboli7e8pshopekf0gq.apps.googleusercontent.com";
 
