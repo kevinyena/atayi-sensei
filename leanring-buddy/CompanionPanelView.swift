@@ -54,6 +54,13 @@ struct CompanionPanelView: View {
         }
         .frame(width: 320)
         .background(panelBackground)
+        .onReceive(NotificationCenter.default.publisher(for: .clickyPanelDidOpen)) { _ in
+            // Refresh license status + credits every time the panel opens
+            // so the user always sees the latest state.
+            Task {
+                await licenseManager.refreshStatus()
+            }
+        }
     }
 
     @ViewBuilder

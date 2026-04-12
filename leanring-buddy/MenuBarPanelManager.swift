@@ -16,6 +16,7 @@ import SwiftUI
 
 extension Notification.Name {
     static let clickyDismissPanel = Notification.Name("clickyDismissPanel")
+    static let clickyPanelDidOpen = Notification.Name("clickyPanelDidOpen")
 }
 
 /// Custom NSPanel subclass that can become the key window even with
@@ -136,6 +137,10 @@ final class MenuBarPanelManager: NSObject {
         panel?.makeKeyAndOrderFront(nil)
         panel?.orderFrontRegardless()
         installClickOutsideMonitor()
+
+        // Notify observers (LicenseManager, CompanionManager) so they can
+        // refresh credits and subscription status every time the panel opens.
+        NotificationCenter.default.post(name: .clickyPanelDidOpen, object: nil)
     }
 
     private func hidePanel() {

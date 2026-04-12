@@ -64,7 +64,7 @@ function createPlanChooserModal() {
           key: "trial",
           title: "Free trial",
           price: "7 days free",
-          subtitle: "30 min / day of talk time",
+          subtitle: "15 min / day of talk time",
           features: ["1 Mac", "Full feature access", "No credit card"],
           ctaLabel: "Start free trial",
           accent: "#3b82f6",
@@ -117,7 +117,7 @@ function renderPlanCard({ key, title, price, period = "", subtitle, features, ct
     onmouseover="this.style.transform='translateY(-2px)';this.style.borderColor='${accent}';"
     onmouseout="this.style.transform='translateY(0)';this.style.borderColor='${isPopular ? accent : "rgba(255, 255, 255, 0.08)"}';"
     >
-      ${isPopular ? `<div style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: ${accent}; color: black; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 99px; letter-spacing: 0.5px;">MOST POPULAR</div>` : ""}
+      ${isPopular ? `<div style="position: absolute; top: -10px; left: 0; right: 0; display: flex; justify-content: center;"><span style="background: ${accent}; color: black; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 99px; letter-spacing: 0.5px;">MOST POPULAR</span></div>` : ""}
       <div style="font-size: 14px; color: rgba(255, 255, 255, 0.6); margin-bottom: 4px;">${title}</div>
       <div style="display: flex; align-items: baseline; gap: 4px; margin-bottom: 2px;">
         <span style="font-size: 28px; font-weight: 700; color: white;">${price}</span>
@@ -223,12 +223,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Hide the Windows button for now — not supported yet
+  // Wire Windows download to the GitHub Release asset (157 MB, too large for Pages)
   const winDownloadButton = document.getElementById("downloadWinBtn");
   if (winDownloadButton) {
-    winDownloadButton.style.opacity = "0.4";
-    winDownloadButton.style.pointerEvents = "none";
-    const winLabel = document.getElementById("downloadWinLabel");
-    if (winLabel) winLabel.textContent = "windows (coming soon)";
+    winDownloadButton.href = "https://github.com/kevinyena/atayi-sensei/releases/download/v1.0.0/Atayi.Sensei.exe";
+    winDownloadButton.setAttribute("download", "");
+    winDownloadButton.addEventListener("click", () => {
+      api.trackEvent("download_click", "index", { platform: "windows" }).catch(() => {});
+    });
   }
 });

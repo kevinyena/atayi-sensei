@@ -140,8 +140,8 @@ export interface AdminTokenPayload {
 export const PLAN_LIMITS: Record<Plan, { max_devices: number; monthly_credit_allowance: number; daily_cap?: number }> = {
   trial: {
     max_devices: 1,
-    monthly_credit_allowance: 12600, // 7 days × 1800/day, matches trial duration
-    daily_cap: 1800, // 30 minutes of talk per day
+    monthly_credit_allowance: 6300, // 7 days × 900/day, matches trial duration
+    daily_cap: 900, // 15 minutes of talk per day
   },
   starter: {
     max_devices: 1,
