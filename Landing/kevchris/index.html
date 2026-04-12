@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Atayi Sensei</title>
+  <link rel="icon" type="image/png" href="/MYE4a.jpg" />
+  <meta name="robots" content="noindex, nofollow" />
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: #fff; color: #111; -webkit-font-smoothing: antialiased;
+    }
+    nav {
+      display:flex;align-items:center;justify-content:space-between;
+      padding:16px 32px;border-bottom:1px solid #e5e5e5;
+    }
+    .nav-logo { display:flex;align-items:center;gap:10px;text-decoration:none;color:#111; }
+    .nav-logo img { width:28px;height:28px;border-radius:6px; }
+    .nav-logo span { font-size:14px;font-weight:700; }
+    .nav-right { display:flex;align-items:center;gap:12px; }
+    .nav-email { font-size:12px;color:#999; }
+    .btn-sm { background:none;border:1px solid #e5e5e5;color:#555;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit; }
+    .btn-sm:hover { border-color:#999; }
+
+    .page { max-width:1100px;margin:0 auto;padding:24px 24px 60px; }
+
+    /* Login */
+    .login-container { max-width:400px;margin:80px auto;text-align:center; }
+    .login-container h1 { font-size:22px;font-weight:800;margin-bottom:8px; }
+    .login-container p { font-size:13px;color:#555;margin-bottom:24px; }
+    .google-btn {
+      width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+      background:#fff;color:#333;border:1px solid #e5e5e5;border-radius:10px;
+      padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;
+    }
+    .google-btn:hover { border-color:#999; }
+    .error-box { display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:13px;color:#dc2626;margin-top:12px; }
+
+    /* Stats */
+    .stats-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:24px; }
+    .stat-card { background:#f9f9f9;border:1px solid #e5e5e5;border-radius:12px;padding:16px; }
+    .stat-label { font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px; }
+    .stat-value { font-size:24px;font-weight:800;color:#111; }
+    .stat-sub { font-size:11px;color:#999;margin-top:4px; }
+
+    /* Signup breakdown */
+    .breakdown-table { width:100%;border-collapse:collapse;font-size:12px;margin-top:8px; }
+    .breakdown-table th { text-align:left;color:#999;font-weight:500;padding:4px 8px;border-bottom:1px solid #f0f0f0; }
+    .breakdown-table td { padding:4px 8px;border-bottom:1px solid #f0f0f0; }
+
+    /* Filters */
+    .filters { display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap; }
+    .filters input, .filters select {
+      background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:8px 12px;
+      font-size:13px;color:#111;outline:none;font-family:inherit;
+    }
+    .filters input:focus, .filters select:focus { border-color:#3b82f6; }
+    .filters input { flex:1;min-width:200px; }
+
+    /* Users table */
+    .users-table { width:100%;border-collapse:collapse; }
+    .users-table th { text-align:left;font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.5px;padding:8px 10px;border-bottom:2px solid #e5e5e5; }
+    .users-table td { padding:10px;border-bottom:1px solid #f0f0f0;font-size:13px;vertical-align:middle; }
+    .users-table tr:hover { background:#fafafa; }
+    .plan-badge { display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;text-transform:uppercase; }
+    .plan-trial { background:#eff6ff;color:#3b82f6; }
+    .plan-starter { background:#fefce8;color:#ca8a04; }
+    .plan-ultra { background:#faf5ff;color:#a855f7; }
+    .status-dot { display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px; }
+    .status-active { background:#22c55e; }
+    .status-trialing { background:#3b82f6; }
+    .status-paused { background:#f59e0b; }
+    .status-blocked { background:#ef4444; }
+    .status-canceled { background:#999; }
+    .credits-bar { height:4px;background:#e5e5e5;border-radius:99px;overflow:hidden;width:80px;display:inline-block; }
+    .credits-fill { height:100%;border-radius:99px; }
+
+    /* Actions */
+    .action-btn { background:none;border:1px solid #e5e5e5;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit;margin-right:4px; }
+    .action-btn:hover { border-color:#999; }
+    .action-btn.danger { color:#dc2626;border-color:#fecaca; }
+    .action-btn.danger:hover { background:#fef2f2; }
+    .action-btn.warn { color:#ca8a04;border-color:#fde68a; }
+    .action-btn.warn:hover { background:#fefce8; }
+
+    /* Drawer */
+    .drawer-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:100;display:none; }
+    .drawer { position:fixed;top:0;right:0;bottom:0;width:420px;max-width:100%;background:#fff;border-left:1px solid #e5e5e5;z-index:101;overflow-y:auto;padding:24px;display:none; }
+    .drawer h3 { font-size:16px;font-weight:700;margin-bottom:16px; }
+    .drawer-close { position:absolute;top:16px;right:16px;background:none;border:none;font-size:20px;color:#999;cursor:pointer; }
+    .drawer-section { background:#f9f9f9;border:1px solid #e5e5e5;border-radius:10px;padding:14px;margin-bottom:12px; }
+    .drawer-label { font-size:11px;color:#999;margin-bottom:6px; }
+    .drawer-value { font-size:13px;color:#111; }
+    .drawer-row { display:flex;justify-content:space-between;padding:4px 0; }
+
+    @media (max-width: 768px) {
+      nav { padding:12px 16px; }
+      .page { padding:16px; }
+      .drawer { width:100%; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a class="nav-logo" href="/">
+      <img src="/MYE4a.jpg" alt="Atayi Sensei" />
+      <span>Atayi Sensei Admin</span>
+    </a>
+    <div class="nav-right" id="navRight" style="display:none;">
+      <span class="nav-email" id="adminEmail"></span>
+      <button class="btn-sm" id="logoutBtn">Log out</button>
+    </div>
+  </nav>
+
+  <!-- Login -->
+  <div class="login-container" id="loginSection">
+    <h1>Admin Dashboard</h1>
+    <p>Sign in with an authorized Google account.</p>
+    <button class="google-btn" id="googleLoginBtn">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Sign in with Google
+    </button>
+    <div id="loginError" class="error-box"></div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="page" id="dashboard" style="display:none;">
+    <div id="statsContainer"></div>
+    <div id="signupBreakdown" style="margin-bottom:24px;"></div>
+
+    <h2 style="font-size:16px;font-weight:700;margin-bottom:12px;">Users</h2>
+    <div class="filters">
+      <input type="text" id="searchInput" placeholder="Search by email..." />
+      <select id="planFilter">
+        <option value="all">All plans</option>
+        <option value="trial">Trial</option>
+        <option value="starter">Starter</option>
+        <option value="ultra">Ultra</option>
+      </select>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Plan</th>
+            <th>Status</th>
+            <th>Credits</th>
+            <th>Gemini Tokens</th>
+            <th>Cost</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="usersTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Drawer -->
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+  <div class="drawer" id="drawer">
+    <button class="drawer-close" id="drawerClose">&times;</button>
+    <div id="drawerContent"></div>
+  </div>
+
+  <script type="module">
+    import { api } from "/js/api.js";
+
+    const GOOGLE_CLIENT_ID = "665011541151-pglu1e7pij41rsboli7e8pshopekf0gq.apps.googleusercontent.com";
+
+    let adminToken = localStorage.getItem("atayi_admin_token_kc");
+    let adminEmail = localStorage.getItem("atayi_admin_email_kc");
+
+    const loginSection = document.getElementById("loginSection");
+    const dashboard = document.getElementById("dashboard");
+    const navRight = document.getElementById("navRight");
+    const loginError = document.getElementById("loginError");
+
+    if (adminToken) showDashboard();
+
+    // Google login
+    document.getElementById("googleLoginBtn").addEventListener("click", async () => {
+      try {
+        await loadGoogleScript();
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: async (response) => {
+            if (!response.credential) return;
+            loginError.style.display = "none";
+            const result = await api.adminGoogleLogin(response.credential);
+            if (result.ok) {
+              adminToken = result.body.admin_token;
+              adminEmail = result.body.email;
+              localStorage.setItem("atayi_admin_token_kc", adminToken);
+              localStorage.setItem("atayi_admin_email_kc", adminEmail);
+              showDashboard();
+            } else {
+              loginError.textContent = result.body.message || "Access denied.";
+              loginError.style.display = "block";
+            }
+          },
+          auto_select: false,
+        });
+        google.accounts.id.prompt();
+      } catch {
+        loginError.textContent = "Could not load Google Sign-In.";
+        loginError.style.display = "block";
+      }
+    });
+
+    let googleLoaded = false;
+    function loadGoogleScript() {
+      if (googleLoaded) return Promise.resolve();
+      return new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://accounts.google.com/gsi/client";
+        s.async = true;
+        s.onload = () => { googleLoaded = true; resolve(); };
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+
+    // Logout
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      localStorage.removeItem("atayi_admin_token_kc");
+      localStorage.removeItem("atayi_admin_email_kc");
+      adminToken = null;
+      loginSection.style.display = "block";
+      dashboard.style.display = "none";
+      navRight.style.display = "none";
+    });
+
+    // Dashboard
+    async function showDashboard() {
+      loginSection.style.display = "none";
+      dashboard.style.display = "block";
+      navRight.style.display = "flex";
+      document.getElementById("adminEmail").textContent = adminEmail;
+
+      await Promise.all([loadStats(), loadSignupStats(), loadUsers()]);
+    }
+
+    async function loadStats() {
+      const r = await api.adminStats(adminToken);
+      if (!r.ok) { handleAuthError(r); return; }
+      const d = r.body;
+      document.getElementById("statsContainer").innerHTML = `
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Users</div>
+            <div class="stat-value">${d.total_users}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Active Subscriptions</div>
+            <div class="stat-value">${d.active_subscriptions?.total ?? 0}</div>
+            <div class="stat-sub">Starter: ${d.active_subscriptions?.starter ?? 0} &middot; Ultra: ${d.active_subscriptions?.ultra ?? 0}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Trials Active</div>
+            <div class="stat-value">${d.trials_in_progress}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">MRR</div>
+            <div class="stat-value">$${d.estimated_mrr_usd}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Today's Visits</div>
+            <div class="stat-value">${d.today_visits}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Today's Downloads</div>
+            <div class="stat-value">${d.today_downloads}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadSignupStats() {
+      const r = await api.adminSignupStats(adminToken);
+      if (!r.ok) return;
+      const { signups, downloads } = r.body;
+      const plans = ["trial", "starter", "ultra"];
+      document.getElementById("signupBreakdown").innerHTML = `
+        <div class="stat-card">
+          <div class="stat-label">Signups Breakdown</div>
+          <table class="breakdown-table">
+            <thead><tr><th>Plan</th><th>Total</th><th>Today</th><th>3 days</th><th>7 days</th><th>30 days</th></tr></thead>
+            <tbody>
+              <tr style="font-weight:600;">
+                <td>All</td><td>${signups.total}</td><td>${signups.today}</td><td>${signups.last3days}</td><td>${signups.last7days}</td><td>${signups.last30days}</td>
+              </tr>
+              ${plans.map(p => {
+                const s = signups.byPlan?.[p] || { total:0, today:0, last3days:0, last7days:0, last30days:0 };
+                return `<tr><td><span class="plan-badge plan-${p}">${p}</span></td><td>${s.total}</td><td>${s.today}</td><td>${s.last3days}</td><td>${s.last7days}</td><td>${s.last30days}</td></tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+          <div class="stat-sub" style="margin-top:8px;">Downloads: ${downloads.total} total, ${downloads.today} today</div>
+        </div>
+      `;
+    }
+
+    // Users
+    let searchTimeout;
+    document.getElementById("searchInput").addEventListener("input", () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(loadUsers, 300);
+    });
+    document.getElementById("planFilter").addEventListener("change", loadUsers);
+
+    async function loadUsers() {
+      const search = document.getElementById("searchInput").value.trim();
+      const plan = document.getElementById("planFilter").value;
+      const r = await api.adminUsers(adminToken, { search, plan, limit: 200 });
+      if (!r.ok) { handleAuthError(r); return; }
+
+      const tbody = document.getElementById("usersTableBody");
+      if (!r.body.users || r.body.users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:24px;">No users found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = r.body.users.map(u => {
+        const plan = u.plan || "none";
+        const creditsUsed = u.credits_used_this_period || 0;
+        const creditsMax = u.monthly_credit_allowance || 1;
+        const pct = Math.min(100, (creditsUsed / creditsMax) * 100);
+        const planColor = { trial: "#3b82f6", starter: "#ca8a04", ultra: "#a855f7" }[plan] || "#999";
+
+        // Token + cost from sessions (aggregated in matview)
+        const totalTokens = (u.total_audio_input_tokens || 0) + (u.total_audio_output_tokens || 0);
+        const totalCost = parseFloat(u.total_estimated_cost_usd || "0").toFixed(2);
+
+        const statusClass = u.is_blocked ? "blocked" : u.is_paused ? "paused" : u.subscription_status === "active" ? "active" : u.subscription_status === "trialing" ? "trialing" : "canceled";
+        const statusLabel = u.is_blocked ? "Blocked" : u.is_paused ? "Paused" : u.subscription_status || "none";
+
+        return `<tr>
+          <td><a href="#" onclick="window._openDrawer('${u.user_id}');return false;" style="color:#3b82f6;text-decoration:none;">${esc(u.email)}</a></td>
+          <td><span class="plan-badge plan-${plan}">${plan}</span></td>
+          <td><span class="status-dot status-${statusClass}"></span>${statusLabel}</td>
+          <td>
+            <div class="credits-bar"><div class="credits-fill" style="width:${pct}%;background:${planColor};"></div></div>
+            <div style="font-size:10px;color:#999;">${creditsUsed.toLocaleString()}/${creditsMax.toLocaleString()}</div>
+          </td>
+          <td style="font-size:12px;">${totalTokens.toLocaleString()}</td>
+          <td style="font-size:12px;">$${totalCost}</td>
+          <td>
+            ${!u.is_paused && !u.is_blocked ? `<button class="action-btn warn" onclick="window._pauseUser('${u.user_id}')">Pause</button>` : ""}
+            ${u.is_paused ? `<button class="action-btn" onclick="window._unpauseUser('${u.user_id}')">Unpause</button>` : ""}
+            ${!u.is_blocked ? `<button class="action-btn danger" onclick="window._blockUser('${u.user_id}')">Block</button>` : `<button class="action-btn" onclick="window._unblockUser('${u.user_id}')">Unblock</button>`}
+            <button class="action-btn danger" onclick="window._deleteUser('${u.user_id}','${esc(u.email)}')">Delete</button>
+          </td>
+        </tr>`;
+      }).join("");
+    }
+
+    // Drawer
+    const drawer = document.getElementById("drawer");
+    const drawerOverlay = document.getElementById("drawerOverlay");
+    document.getElementById("drawerClose").addEventListener("click", closeDrawer);
+    drawerOverlay.addEventListener("click", closeDrawer);
+
+    function closeDrawer() {
+      drawer.style.display = "none";
+      drawerOverlay.style.display = "none";
+    }
+
+    window._openDrawer = async (userId) => {
+      const r = await api.adminUserDetail(adminToken, userId);
+      if (!r.ok) return;
+      const { user, subscription, devices, recent_sessions } = r.body;
+
+      const totalTokens = recent_sessions.reduce((s, sess) => s + (sess.audio_input_tokens || 0) + (sess.audio_output_tokens || 0), 0);
+      const totalCost = recent_sessions.reduce((s, sess) => s + parseFloat(sess.estimated_cost_usd || "0"), 0).toFixed(4);
+
+      document.getElementById("drawerContent").innerHTML = `
+        <h3>${esc(user.email)}</h3>
+        <div class="drawer-section">
+          <div class="drawer-label">Account</div>
+          <div class="drawer-row"><span>ID</span><span style="font-size:11px;color:#999;">${user.id}</span></div>
+          <div class="drawer-row"><span>Provider</span><span>${user.auth_provider || "email"}</span></div>
+          <div class="drawer-row"><span>Created</span><span>${new Date(user.created_at).toLocaleDateString()}</span></div>
+          <div class="drawer-row"><span>Blocked</span><span>${user.is_blocked ? "Yes" : "No"}</span></div>
+          <div class="drawer-row"><span>Paused</span><span>${user.is_paused ? "Yes" : "No"}</span></div>
+        </div>
+
+        ${subscription ? `
+        <div class="drawer-section">
+          <div class="drawer-label">Subscription</div>
+          <div class="drawer-row"><span>Plan</span><span class="plan-badge plan-${subscription.plan}">${subscription.plan}</span></div>
+          <div class="drawer-row"><span>Status</span><span>${subscription.status}</span></div>
+          <div class="drawer-row"><span>Credits</span><span>${subscription.credits_used_this_period?.toLocaleString()} / ${subscription.monthly_credit_allowance?.toLocaleString()}</span></div>
+          <div class="drawer-row"><span>Period ends</span><span>${subscription.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString() : "—"}</span></div>
+        </div>
+        ` : ""}
+
+        <div class="drawer-section">
+          <div class="drawer-label">Token Usage (all sessions)</div>
+          <div class="drawer-row"><span>Total Gemini tokens</span><span>${totalTokens.toLocaleString()}</span></div>
+          <div class="drawer-row"><span>Estimated cost</span><span>$${totalCost}</span></div>
+        </div>
+
+        ${devices.length > 0 ? `
+        <div class="drawer-section">
+          <div class="drawer-label">Devices (${devices.length})</div>
+          ${devices.map(d => `
+            <div class="drawer-row">
+              <span>${esc(d.device_name || "Unknown")}</span>
+              <span style="font-size:11px;color:#999;">${d.last_active_at ? new Date(d.last_active_at).toLocaleDateString() : "Never"}</span>
+            </div>
+          `).join("")}
+        </div>
+        ` : ""}
+
+        ${recent_sessions.length > 0 ? `
+        <div class="drawer-section">
+          <div class="drawer-label">Recent Sessions</div>
+          ${recent_sessions.slice(0, 10).map(s => `
+            <div class="drawer-row">
+              <span style="font-size:12px;">${new Date(s.started_at).toLocaleString()}</span>
+              <span style="font-size:12px;">${s.credits_consumed} cr / $${parseFloat(s.estimated_cost_usd || "0").toFixed(4)}</span>
+            </div>
+          `).join("")}
+        </div>
+        ` : ""}
+      `;
+      drawer.style.display = "block";
+      drawerOverlay.style.display = "block";
+    };
+
+    // Actions
+    window._pauseUser = async (userId) => {
+      const reason = prompt("Reason for pausing this account:");
+      if (reason === null) return;
+      await api.adminPauseUser(adminToken, userId, reason);
+      loadUsers();
+    };
+
+    window._unpauseUser = async (userId) => {
+      await api.adminUnpauseUser(adminToken, userId);
+      loadUsers();
+    };
+
+    window._blockUser = async (userId) => {
+      const reason = prompt("Reason for blocking this account:");
+      if (reason === null) return;
+      await api.adminBlockUser(adminToken, userId, reason);
+      loadUsers();
+    };
+
+    window._unblockUser = async (userId) => {
+      await api.adminUnblockUser(adminToken, userId);
+      loadUsers();
+    };
+
+    window._deleteUser = async (userId, email) => {
+      if (!confirm(`Permanently delete ${email}? This cannot be undone.`)) return;
+      const reason = prompt("Reason for deletion:");
+      if (reason === null) return;
+      await api.adminDeleteUser(adminToken, userId, reason);
+      closeDrawer();
+      loadUsers();
+      loadStats();
+      loadSignupStats();
+    };
+
+    function handleAuthError(r) {
+      if (r.status === 401) {
+        localStorage.removeItem("atayi_admin_token_kc");
+        adminToken = null;
+        loginSection.style.display = "block";
+        dashboard.style.display = "none";
+        navRight.style.display = "none";
+      }
+    }
+
+    function esc(str) {
+      const d = document.createElement("div");
+      d.textContent = str || "";
+      return d.innerHTML;
+    }
+
+    // Auto refresh every 30s
+    setInterval(() => {
+      if (adminToken) {
+        loadStats();
+        loadSignupStats();
+        loadUsers();
+      }
+    }, 30000);
+  </script>
+</body>
+</html>

@@ -21,10 +21,12 @@
 import { SupabaseClient } from "../db/supabase";
 import { extractBearerToken, signJWT, verifyJWT } from "../auth/jwt";
 import { verifyPassword } from "../auth/password";
+import { sendAccountStatusEmail } from "../lib/email";
 import { errorResponse, jsonResponse } from "../lib/response";
 import type { AdminTokenPayload, Env } from "../types";
 
 const ADMIN_EMAIL = "admin@atayisensei.io"; // hardcoded — single admin account
+const ADMIN_ALLOWED_EMAILS = ["kevinyena9@gmail.com", "toedembo@gmail.com"];
 
 async function verifyAdminToken(request: Request, env: Env): Promise<AdminTokenPayload | null> {
   const token = extractBearerToken(request.headers.get("Authorization"));
@@ -247,6 +249,146 @@ export async function handleAdminUnblockDevice(request: Request, env: Env): Prom
     target_device_id: body.device_id,
   });
   return jsonResponse({ unblocked: true });
+}
+
+// ========== Google-based admin login ==========
+
+export async function handleAdminGoogleLogin(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json().catch(() => null)) as { id_token?: string } | null;
+  if (!body?.id_token) return errorResponse("missing_token", "Google id_token required", 400);
+
+  // Verify Google ID token
+  const tokenInfoResponse = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(body.id_token)}`,
+  );
+  if (!tokenInfoResponse.ok) {
+    return errorResponse("invalid_google_token", "Google token verification failed", 401);
+  }
+
+  const tokenInfo = (await tokenInfoResponse.json()) as { aud: string; email: string };
+
+  if (tokenInfo.aud !== env.GOOGLE_CLIENT_ID) {
+    return errorResponse("invalid_audience", "Token not issued for this app", 401);
+  }
+
+  const email = tokenInfo.email.toLowerCase();
+  if (!ADMIN_ALLOWED_EMAILS.includes(email)) {
+    return errorResponse("not_authorized", "This Google account is not authorized for admin access", 403);
+  }
+
+  const adminToken = await signJWT<AdminTokenPayload>(
+    {
+      admin_email: email,
+      scope: "admin",
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+    },
+    env.JWT_SIGNING_SECRET,
+  );
+
+  const supabase = new SupabaseClient(env);
+  await supabase.logAdminAction({
+    admin_email: email,
+    action: "google_login",
+    metadata: { ip: request.headers.get("cf-connecting-ip") ?? "unknown" },
+  });
+
+  return jsonResponse({ admin_token: adminToken, email, expires_in: 24 * 60 * 60 });
+}
+
+// ========== Enhanced stats ==========
+
+export async function handleAdminSignupStats(request: Request, env: Env): Promise<Response> {
+  const admin = await verifyAdminToken(request, env);
+  if (!admin) return errorResponse("unauthorized", "Admin token required", 401);
+
+  const supabase = new SupabaseClient(env);
+  const signupStats = await supabase.getSignupStats();
+
+  // Also get download events count
+  const [totalDownloads, todayDownloads] = await Promise.all([
+    fetch(`${env.SUPABASE_URL}/rest/v1/landing_events?event_type=eq.download_click&select=id`, {
+      headers: supabaseHeaders(env),
+    }).then((r) => r.json().then((rows) => (rows as unknown[]).length)),
+    fetch(
+      `${env.SUPABASE_URL}/rest/v1/landing_events?event_type=eq.download_click&created_at=gte.${todayISO()}&select=id`,
+      { headers: supabaseHeaders(env) },
+    ).then((r) => r.json().then((rows) => (rows as unknown[]).length)),
+  ]);
+
+  return jsonResponse({ signups: signupStats, downloads: { total: totalDownloads, today: todayDownloads } });
+}
+
+// ========== Pause / unpause user ==========
+
+export async function handleAdminPauseUser(request: Request, env: Env): Promise<Response> {
+  const admin = await verifyAdminToken(request, env);
+  if (!admin) return errorResponse("unauthorized", "Admin token required", 401);
+
+  const body = (await request.json()) as { user_id?: string; reason?: string };
+  if (!body.user_id) return errorResponse("missing_user_id", "user_id required", 400);
+
+  const supabase = new SupabaseClient(env);
+  const user = await supabase.findUserById(body.user_id);
+  if (!user) return errorResponse("not_found", "User not found", 404);
+
+  await supabase.pauseUser(body.user_id, body.reason ?? "paused by admin");
+  await supabase.logAdminAction({
+    admin_email: admin.admin_email,
+    action: "pause_user",
+    target_user_id: body.user_id,
+    reason: body.reason,
+  });
+
+  await sendAccountStatusEmail(env.RESEND_API_KEY, user.email, "paused", body.reason ?? "paused by admin");
+
+  return jsonResponse({ paused: true });
+}
+
+export async function handleAdminUnpauseUser(request: Request, env: Env): Promise<Response> {
+  const admin = await verifyAdminToken(request, env);
+  if (!admin) return errorResponse("unauthorized", "Admin token required", 401);
+
+  const body = (await request.json()) as { user_id?: string };
+  if (!body.user_id) return errorResponse("missing_user_id", "user_id required", 400);
+
+  const supabase = new SupabaseClient(env);
+  await supabase.unpauseUser(body.user_id);
+  await supabase.logAdminAction({
+    admin_email: admin.admin_email,
+    action: "unpause_user",
+    target_user_id: body.user_id,
+  });
+
+  return jsonResponse({ unpaused: true });
+}
+
+// ========== Delete user ==========
+
+export async function handleAdminDeleteUser(request: Request, env: Env): Promise<Response> {
+  const admin = await verifyAdminToken(request, env);
+  if (!admin) return errorResponse("unauthorized", "Admin token required", 401);
+
+  const body = (await request.json()) as { user_id?: string; reason?: string };
+  if (!body.user_id) return errorResponse("missing_user_id", "user_id required", 400);
+
+  const supabase = new SupabaseClient(env);
+  const user = await supabase.findUserById(body.user_id);
+  if (!user) return errorResponse("not_found", "User not found", 404);
+
+  // Send notification email before deletion
+  await sendAccountStatusEmail(env.RESEND_API_KEY, user.email, "deleted", body.reason ?? "account deleted by admin");
+
+  await supabase.deleteUser(body.user_id);
+  await supabase.logAdminAction({
+    admin_email: admin.admin_email,
+    action: "delete_user",
+    target_user_id: body.user_id,
+    reason: body.reason,
+    metadata: { deleted_email: user.email },
+  });
+
+  return jsonResponse({ deleted: true });
 }
 
 // ========== helpers ==========

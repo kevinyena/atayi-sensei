@@ -434,6 +434,97 @@ export class SupabaseClient {
     return await this.request<unknown[]>(`/admin_user_stats?${queryParts.join("&")}`);
   }
 
+  async pauseUser(userId: string, reason: string): Promise<void> {
+    await this.request(`/users?id=eq.${userId}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        is_paused: true,
+        paused_reason: reason,
+        paused_at: new Date().toISOString(),
+      }),
+    });
+  }
+
+  async unpauseUser(userId: string): Promise<void> {
+    await this.request(`/users?id=eq.${userId}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        is_paused: false,
+        paused_reason: null,
+        paused_at: null,
+      }),
+    });
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    // Delete in order: sessions → daily_usage → devices → license_codes → subscriptions → landing_events → user
+    await this.request(`/sessions?user_id=eq.${userId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    await this.request(`/daily_usage?user_id=eq.${userId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    await this.request(`/devices?user_id=eq.${userId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    await this.request(`/license_codes?user_id=eq.${userId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    await this.request(`/subscriptions?user_id=eq.${userId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    await this.request(`/otps?email=eq.${encodeURIComponent((await this.findUserById(userId))?.email ?? "")}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    await this.request(`/users?id=eq.${userId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+  }
+
+  async getSignupStats(): Promise<{
+    total: number;
+    today: number;
+    last3days: number;
+    last7days: number;
+    last30days: number;
+    byPlan: Record<string, { total: number; today: number; last3days: number; last7days: number; last30days: number }>;
+  }> {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Get all subscriptions with created_at and plan
+    const allSubs = await this.request<Array<{ plan: string; created_at: string }>>(
+      `/subscriptions?select=plan,created_at&order=created_at.desc`,
+    );
+
+    const result = {
+      total: allSubs.length,
+      today: 0,
+      last3days: 0,
+      last7days: 0,
+      last30days: 0,
+      byPlan: {} as Record<string, { total: number; today: number; last3days: number; last7days: number; last30days: number }>,
+    };
+
+    for (const sub of allSubs) {
+      const plan = sub.plan;
+      if (!result.byPlan[plan]) {
+        result.byPlan[plan] = { total: 0, today: 0, last3days: 0, last7days: 0, last30days: 0 };
+      }
+      result.byPlan[plan].total++;
+
+      if (sub.created_at >= todayStart) {
+        result.today++;
+        result.byPlan[plan].today++;
+      }
+      if (sub.created_at >= threeDaysAgo) {
+        result.last3days++;
+        result.byPlan[plan].last3days++;
+      }
+      if (sub.created_at >= sevenDaysAgo) {
+        result.last7days++;
+        result.byPlan[plan].last7days++;
+      }
+      if (sub.created_at >= thirtyDaysAgo) {
+        result.last30days++;
+        result.byPlan[plan].last30days++;
+      }
+    }
+
+    return result;
+  }
+
   async logAdminAction(params: {
     admin_email: string;
     action: string;

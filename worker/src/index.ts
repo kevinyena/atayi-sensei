@@ -28,13 +28,18 @@ import { handleSessionPreflight } from "./routes/session";
 import { handleLandingEvent, handleRefreshStats } from "./routes/landing";
 import {
   handleAdminLogin,
+  handleAdminGoogleLogin,
   handleAdminStats,
+  handleAdminSignupStats,
   handleAdminUsers,
   handleAdminUserDetail,
   handleAdminBlockUser,
   handleAdminUnblockUser,
   handleAdminBlockDevice,
   handleAdminUnblockDevice,
+  handleAdminPauseUser,
+  handleAdminUnpauseUser,
+  handleAdminDeleteUser,
 } from "./routes/admin";
 import {
   corsPreflightResponse,
@@ -129,8 +134,14 @@ export default {
       if (url.pathname === "/api/admin/login" && method === "POST") {
         return await handleAdminLogin(request, env);
       }
+      if (url.pathname === "/api/admin/google-login" && method === "POST") {
+        return await handleAdminGoogleLogin(request, env);
+      }
       if (url.pathname === "/api/admin/stats" && method === "GET") {
         return await handleAdminStats(request, env);
+      }
+      if (url.pathname === "/api/admin/signup-stats" && method === "GET") {
+        return await handleAdminSignupStats(request, env);
       }
       if (url.pathname === "/api/admin/users" && method === "GET") {
         return await handleAdminUsers(request, env);
@@ -150,6 +161,15 @@ export default {
       }
       if (url.pathname === "/api/admin/unblock-device" && method === "POST") {
         return await handleAdminUnblockDevice(request, env);
+      }
+      if (url.pathname === "/api/admin/pause-user" && method === "POST") {
+        return await handleAdminPauseUser(request, env);
+      }
+      if (url.pathname === "/api/admin/unpause-user" && method === "POST") {
+        return await handleAdminUnpauseUser(request, env);
+      }
+      if (url.pathname === "/api/admin/delete-user" && method === "POST") {
+        return await handleAdminDeleteUser(request, env);
       }
 
       // Backwards-compat: the legacy route still exists so existing builds of

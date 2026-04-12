@@ -265,6 +265,11 @@ export async function handleGoogleAuth(request: Request, env: Env): Promise<Resp
   } else {
     const licenses = await supabase.findLicensesByUserId(user.id);
     licenseCode = licenses.find((l) => l.revoked_at === null)?.code ?? null;
+
+    // Re-send the license code email for returning users who may not have received it
+    if (licenseCode) {
+      await sendLicenseCodeEmail(env.RESEND_API_KEY, email, licenseCode, existingSubscription.plan ?? "trial");
+    }
   }
 
   // Issue session JWT

@@ -46,6 +46,32 @@ export async function sendOTPEmail(resendApiKey: string, to: string, code: strin
   `);
 }
 
+export async function sendAccountStatusEmail(
+  resendApiKey: string,
+  to: string,
+  action: "paused" | "blocked" | "deleted",
+  reason: string,
+): Promise<boolean> {
+  const titles: Record<string, string> = {
+    paused: "Your Atayi Sensei account has been paused",
+    blocked: "Your Atayi Sensei account has been blocked",
+    deleted: "Your Atayi Sensei account has been deleted",
+  };
+  const descriptions: Record<string, string> = {
+    paused: "Your account has been temporarily paused. You will not be able to use Atayi Sensei until your account is reactivated.",
+    blocked: "Your account has been blocked due to a policy violation. You will not be able to use Atayi Sensei.",
+    deleted: "Your account and all associated data have been permanently deleted from Atayi Sensei.",
+  };
+  return sendEmail(resendApiKey, to, titles[action], `
+    <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+      <h2 style="color: #111; margin-bottom: 8px;">${titles[action]}</h2>
+      <p style="color: #555; font-size: 14px; line-height: 1.5;">${descriptions[action]}</p>
+      ${reason ? `<p style="color: #555; font-size: 14px;"><strong>Reason:</strong> ${reason}</p>` : ""}
+      <p style="color: #999; font-size: 12px; margin-top: 24px;">If you believe this is a mistake, contact <a href="mailto:support@atayisensei.io" style="color: #3b82f6;">support@atayisensei.io</a>.</p>
+    </div>
+  `);
+}
+
 export async function sendLicenseCodeEmail(
   resendApiKey: string,
   to: string,

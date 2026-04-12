@@ -79,7 +79,68 @@ export const api = {
     return getJSON(`/api/billing/session/${encodeURIComponent(stripeSessionId)}`);
   },
 
+  // ── Auth (email + password + OTP) ───────────────────────────────
+  async signup(email, password) {
+    return postJSON("/api/auth/signup", { email, password });
+  },
+
+  async verifyOTP(email, code, plan) {
+    return postJSON("/api/auth/verify-otp", { email, code, plan });
+  },
+
+  async googleAuth(idToken, plan) {
+    return postJSON("/api/auth/google", { id_token: idToken, plan });
+  },
+
+  async login(email, password) {
+    return postJSON("/api/auth/login", { email, password });
+  },
+
+  async resendOTP(email) {
+    return postJSON("/api/auth/resend-otp", { email });
+  },
+
+  async accountProfile(sessionToken) {
+    return getJSON("/api/account/profile", {
+      Authorization: `Bearer ${sessionToken}`,
+    });
+  },
+
   // ── Admin dashboard ────────────────────────────────────────────
+  async adminGoogleLogin(idToken) {
+    return postJSON("/api/admin/google-login", { id_token: idToken });
+  },
+
+  async adminSignupStats(adminToken) {
+    return getJSON("/api/admin/signup-stats", {
+      Authorization: `Bearer ${adminToken}`,
+    });
+  },
+
+  async adminPauseUser(adminToken, userId, reason) {
+    return postJSON(
+      "/api/admin/pause-user",
+      { user_id: userId, reason },
+      { Authorization: `Bearer ${adminToken}` },
+    );
+  },
+
+  async adminUnpauseUser(adminToken, userId) {
+    return postJSON(
+      "/api/admin/unpause-user",
+      { user_id: userId },
+      { Authorization: `Bearer ${adminToken}` },
+    );
+  },
+
+  async adminDeleteUser(adminToken, userId, reason) {
+    return postJSON(
+      "/api/admin/delete-user",
+      { user_id: userId, reason },
+      { Authorization: `Bearer ${adminToken}` },
+    );
+  },
+
   async adminLogin(password) {
     return postJSON("/api/admin/login", { password });
   },

@@ -46,6 +46,9 @@ export interface User {
   blocked_reason: string | null;
   blocked_at: string | null;
   admin_notes: string | null;
+  is_paused: boolean;
+  paused_reason: string | null;
+  paused_at: string | null;
   password_hash: string | null;
   auth_provider: string;
   google_id: string | null;

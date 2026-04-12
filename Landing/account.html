@@ -5,34 +5,447 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Your account — Atayi Sensei</title>
   <link rel="icon" type="image/png" href="MYE4a.jpg" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: #fff;
+      color: #111;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    /* ── Nav (same as landing) ── */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 48px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none; color: #111;
+    }
+    .nav-logo img { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; }
+    .nav-logo span { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+    #logoutBtn {
+      display: none;
+      background: none; border: 1px solid #e5e5e5; color: #555;
+      border-radius: 8px; padding: 6px 14px; font-size: 13px;
+      cursor: pointer; font-family: inherit; transition: border-color 0.15s;
+    }
+    #logoutBtn:hover { border-color: #999; }
+
+    /* ── Content ── */
+    .page-content {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 64px 24px 80px;
+    }
+    .page-content h1 {
+      font-size: 26px; font-weight: 800; letter-spacing: -0.5px; margin: 0 0 8px;
+    }
+    .page-content .subtitle {
+      font-size: 14px; color: #555; line-height: 1.5; margin: 0 0 28px;
+    }
+
+    /* ── Form elements ── */
+    label {
+      display: block; font-size: 12px; color: #555;
+      margin-bottom: 6px; font-weight: 500;
+    }
+    input[type="email"], input[type="password"], input[type="text"] {
+      width: 100%; background: #fff; border: 1px solid #e5e5e5;
+      border-radius: 10px; padding: 12px 14px; color: #111;
+      font-size: 14px; outline: none; transition: border-color 0.15s;
+      font-family: inherit;
+    }
+    input:focus { border-color: #3b82f6; }
+    input::placeholder { color: #999; }
+
+    .btn-primary {
+      display: block; width: 100%; background: #111; color: #fff;
+      border: none; border-radius: 10px; padding: 12px 20px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      font-family: inherit; transition: opacity 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+
+    .btn-secondary {
+      display: block; width: 100%; background: transparent;
+      border: 1px solid #e5e5e5; color: #555;
+      border-radius: 10px; padding: 12px 20px;
+      font-size: 14px; font-weight: 500; cursor: pointer;
+      font-family: inherit; text-decoration: none; text-align: center;
+      transition: border-color 0.15s;
+    }
+    .btn-secondary:hover { border-color: #999; }
+
+    .google-btn {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: #fff; color: #333; border: 1px solid #e5e5e5; border-radius: 10px;
+      padding: 12px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: border-color 0.15s; font-family: inherit;
+    }
+    .google-btn:hover { border-color: #999; }
+
+    .divider {
+      display: flex; align-items: center; gap: 12px; margin: 18px 0;
+    }
+    .divider-line { flex: 1; height: 1px; background: #e5e5e5; }
+    .divider-text { font-size: 12px; color: #999; }
+
+    .error-box {
+      display: none; background: #fef2f2; border: 1px solid #fecaca;
+      border-radius: 10px; padding: 10px 12px; font-size: 13px; color: #dc2626; margin-top: 12px;
+    }
+    .muted { font-size: 12px; color: #999; text-align: center; margin-top: 20px; }
+    .muted a { color: #3b82f6; text-decoration: none; }
+    .muted a:hover { text-decoration: underline; }
+
+    /* ── Dashboard cards ── */
+    .dash-card {
+      background: #f9f9f9; border: 1px solid #e5e5e5;
+      border-radius: 12px; padding: 18px; margin-bottom: 14px;
+    }
+    .dash-card-label { font-size: 13px; color: #555; margin-bottom: 10px; }
+    .dash-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 0; border-top: 1px solid #f0f0f0;
+    }
+    .plan-badge {
+      display: inline-block; padding: 4px 12px; border-radius: 99px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    .spinner {
+      display: inline-block; width: 18px; height: 18px;
+      border: 2px solid #e5e5e5; border-top-color: #111;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 620px) {
+      nav { padding: 16px 20px; }
+      .page-content { padding: 40px 20px 60px; }
+    }
+  </style>
 </head>
 <body>
-  <nav class="atayi-nav">
-    <a class="logo" href="/">
+  <nav>
+    <a class="nav-logo" href="/">
       <img src="MYE4a.jpg" alt="Atayi Sensei" />
       <span>Atayi Sensei</span>
     </a>
+    <button id="logoutBtn">Log out</button>
   </nav>
 
-  <div class="atayi-card">
-    <h1>Manage your subscription</h1>
-    <p class="subtitle">
-      Your subscription is managed by Stripe. Use the customer portal link you received in your original Stripe receipt email to update your payment method, change plans, or cancel.
-    </p>
+  <div class="page-content">
+    <!-- Login form -->
+    <div id="loginCard">
+      <h1>Log in to your account</h1>
+      <p class="subtitle">Enter your email and password to manage your subscription.</p>
 
-    <div class="atayi-warning">
-      Lost your license code? Email <a href="mailto:support@atayisensei.io" style="color:inherit; text-decoration:underline;">support@atayisensei.io</a> from the address you used at signup and we'll re-issue it.
+      <button class="google-btn" id="googleLoginBtn">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Sign in with Google
+      </button>
+
+      <div class="divider">
+        <div class="divider-line"></div>
+        <span class="divider-text">or</span>
+        <div class="divider-line"></div>
+      </div>
+
+      <form id="loginForm">
+        <label for="emailInput">Email</label>
+        <input type="email" id="emailInput" required autocomplete="email" placeholder="you@example.com" />
+        <div style="height:12px;"></div>
+        <label for="passwordInput">Password</label>
+        <input type="password" id="passwordInput" required placeholder="your password" />
+        <div style="height:16px;"></div>
+        <button type="submit" class="btn-primary" id="loginSubmitBtn">Log in</button>
+      </form>
+
+      <div id="loginError" class="error-box"></div>
+
+      <p class="muted">
+        Don't have an account? <a href="/">Download the app</a> and create one.
+      </p>
     </div>
 
-    <div style="height:14px;"></div>
-
-    <a class="atayi-btn secondary" href="/">Back to home</a>
+    <!-- Dashboard -->
+    <div id="dashboardCard" style="display:none;">
+      <div id="dashboardContent">
+        <div style="text-align:center;padding:24px 0;">
+          <div class="spinner"></div>
+          <p style="margin-top:12px;font-size:13px;color:#999;">Loading your account...</p>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module">
-    import { injectSharedStyles } from "/js/shared-styles.js";
-    injectSharedStyles();
-    import("/js/api.js").then(({ api }) => api.trackEvent("page_view", "account").catch(() => {}));
+    import { api } from "/js/api.js";
+
+    const GOOGLE_CLIENT_ID = "665011541151-pglu1e7pij41rsboli7e8pshopekf0gq.apps.googleusercontent.com";
+
+    const loginCard = document.getElementById("loginCard");
+    const dashboardCard = document.getElementById("dashboardCard");
+    const dashboardContent = document.getElementById("dashboardContent");
+    const loginForm = document.getElementById("loginForm");
+    const loginError = document.getElementById("loginError");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    let sessionToken = localStorage.getItem("atayi_session_token");
+    if (sessionToken) showDashboard();
+
+    // ── Login form ──
+    loginForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      loginError.style.display = "none";
+      const email = document.getElementById("emailInput").value.trim().toLowerCase();
+      const password = document.getElementById("passwordInput").value;
+      const submitBtn = document.getElementById("loginSubmitBtn");
+
+      if (!email || !password) {
+        loginError.textContent = "Enter your email and password.";
+        loginError.style.display = "block";
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Logging in\u2026";
+
+      try {
+        const response = await api.login(email, password);
+        if (response.ok) {
+          sessionToken = response.body.session_token;
+          localStorage.setItem("atayi_session_token", sessionToken);
+          showDashboard();
+        } else {
+          loginError.textContent = response.body.message || "Login failed.";
+          loginError.style.display = "block";
+        }
+      } catch (error) {
+        loginError.textContent = error.message;
+        loginError.style.display = "block";
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Log in";
+      }
+    });
+
+    // ── Google Sign-In ──
+    document.getElementById("googleLoginBtn").addEventListener("click", async () => {
+      try {
+        await loadGoogleScript();
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: async (response) => {
+            if (!response.credential) return;
+            loginError.style.display = "none";
+            const result = await api.googleAuth(response.credential);
+            if (result.ok) {
+              sessionToken = result.body.session_token;
+              localStorage.setItem("atayi_session_token", sessionToken);
+              showDashboard();
+            } else {
+              loginError.textContent = result.body.message || "Google sign-in failed.";
+              loginError.style.display = "block";
+            }
+          },
+          auto_select: false,
+        });
+        google.accounts.id.prompt();
+      } catch {
+        loginError.textContent = "Could not load Google Sign-In.";
+        loginError.style.display = "block";
+      }
+    });
+
+    let googleLoaded = false;
+    function loadGoogleScript() {
+      if (googleLoaded) return Promise.resolve();
+      return new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://accounts.google.com/gsi/client";
+        s.async = true;
+        s.onload = () => { googleLoaded = true; resolve(); };
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+
+    // ── Logout ──
+    logoutBtn.addEventListener("click", () => {
+      localStorage.removeItem("atayi_session_token");
+      sessionToken = null;
+      loginCard.style.display = "block";
+      dashboardCard.style.display = "none";
+      logoutBtn.style.display = "none";
+    });
+
+    // ── Dashboard ──
+    async function showDashboard() {
+      loginCard.style.display = "none";
+      dashboardCard.style.display = "block";
+      logoutBtn.style.display = "block";
+
+      dashboardContent.innerHTML = `
+        <div style="text-align:center;padding:24px 0;">
+          <div class="spinner"></div>
+          <p style="margin-top:12px;font-size:13px;color:#999;">Loading your account...</p>
+        </div>
+      `;
+
+      try {
+        const response = await api.accountProfile(sessionToken);
+        if (!response.ok) {
+          if (response.status === 401) {
+            localStorage.removeItem("atayi_session_token");
+            sessionToken = null;
+            loginCard.style.display = "block";
+            dashboardCard.style.display = "none";
+            logoutBtn.style.display = "none";
+            loginError.textContent = "Session expired. Please log in again.";
+            loginError.style.display = "block";
+            return;
+          }
+          throw new Error(response.body.message || "Could not load account");
+        }
+
+        const { user, subscription, devices, license_code, daily_used, recent_sessions } = response.body;
+        renderDashboard(user, subscription, devices, license_code, daily_used, recent_sessions);
+      } catch (error) {
+        dashboardContent.innerHTML = `
+          <div class="error-box" style="display:block;">${error.message}</div>
+          <button class="btn-secondary" onclick="location.reload()" style="margin-top:12px;">Retry</button>
+        `;
+      }
+    }
+
+    function renderDashboard(user, subscription, devices, licenseCode, dailyUsed, recentSessions) {
+      const plan = subscription?.plan ?? "none";
+      const planColors = { trial: "#3b82f6", starter: "#eab308", ultra: "#a855f7", none: "#999" };
+      const planBgs = { trial: "#eff6ff", starter: "#fefce8", ultra: "#faf5ff", none: "#f9f9f9" };
+      const planColor = planColors[plan] || "#999";
+      const planBg = planBgs[plan] || "#f9f9f9";
+
+      const creditsUsed = subscription?.credits_used ?? 0;
+      const creditsAllowance = subscription?.credits_allowance ?? 0;
+      const creditsRemaining = subscription?.credits_remaining ?? 0;
+      const creditsPercent = creditsAllowance > 0 ? Math.min(100, (creditsUsed / creditsAllowance) * 100) : 0;
+
+      const periodEnd = subscription?.current_period_end
+        ? new Date(subscription.current_period_end).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+        : "\u2014";
+
+      dashboardContent.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+          <div>
+            <h1 style="font-size:22px;font-weight:800;letter-spacing:-0.5px;margin:0 0 4px;">Your account</h1>
+            <p style="margin:0;font-size:13px;color:#999;">${user.email}</p>
+          </div>
+          <span class="plan-badge" style="background:${planBg};color:${planColor};">${plan}</span>
+        </div>
+
+        <!-- Credits -->
+        <div class="dash-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <span style="font-size:13px;color:#555;">Credits this period</span>
+            <span style="font-size:13px;font-weight:600;color:#111;">${creditsUsed.toLocaleString()} / ${creditsAllowance.toLocaleString()}</span>
+          </div>
+          <div style="height:6px;background:#e5e5e5;border-radius:99px;overflow:hidden;">
+            <div style="height:100%;width:${creditsPercent}%;background:${planColor};border-radius:99px;transition:width 0.3s;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px;">
+            <span style="font-size:11px;color:#999;">${creditsRemaining.toLocaleString()} remaining</span>
+            <span style="font-size:11px;color:#999;">Resets ${periodEnd}</span>
+          </div>
+          ${plan === "trial" ? `
+            <div style="font-size:11px;color:#999;margin-top:6px;">
+              Today: ${dailyUsed?.toLocaleString() ?? 0} / 1,800 daily credits used
+            </div>
+          ` : ""}
+        </div>
+
+        <!-- License code -->
+        ${licenseCode ? `
+          <div class="dash-card">
+            <div class="dash-card-label">License code</div>
+            <div style="
+              font-family:'SF Mono',Menlo,Consolas,monospace;font-size:14px;
+              color:#3b82f6;letter-spacing:0.5px;word-break:break-all;user-select:all;
+            ">${licenseCode}</div>
+            <button id="copyLicenseBtn" style="
+              margin-top:10px;background:none;border:1px solid #e5e5e5;
+              color:#555;border-radius:6px;padding:5px 12px;
+              font-size:12px;cursor:pointer;font-family:inherit;
+            ">Copy</button>
+          </div>
+        ` : ""}
+
+        <!-- Devices -->
+        ${devices && devices.length > 0 ? `
+          <div class="dash-card">
+            <div class="dash-card-label">Devices (${devices.length}/${subscription?.max_devices ?? "\u2014"})</div>
+            ${devices.map(d => `
+              <div class="dash-row">
+                <div>
+                  <div style="font-size:13px;color:#111;">${d.name || "Unknown device"}</div>
+                  <div style="font-size:11px;color:#999;">${d.os_version || ""}</div>
+                </div>
+                <div style="font-size:11px;color:#999;">
+                  ${d.last_active ? new Date(d.last_active).toLocaleDateString() : "Never"}
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        ` : ""}
+
+        <!-- Recent sessions -->
+        ${recentSessions && recentSessions.length > 0 ? `
+          <div class="dash-card">
+            <div class="dash-card-label">Recent sessions</div>
+            ${recentSessions.slice(0, 5).map(s => {
+              const startDate = new Date(s.started_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              const startTime = new Date(s.started_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+              return `
+                <div class="dash-row">
+                  <span style="font-size:12px;color:#555;">${startDate} ${startTime}</span>
+                  <span style="font-size:12px;color:#999;">${s.credits_consumed ?? 0} credits</span>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        ` : ""}
+
+        <!-- Actions -->
+        ${plan === "trial" ? `
+          <a href="/" class="btn-primary" style="text-decoration:none;text-align:center;display:block;">Upgrade plan</a>
+        ` : ""}
+        ${subscription?.cancel_at_period_end ? `
+          <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;font-size:13px;color:#92400e;margin-top:12px;">
+            Your subscription will cancel at the end of the billing period (${periodEnd}).
+          </div>
+        ` : ""}
+      `;
+
+      const copyBtn = document.getElementById("copyLicenseBtn");
+      if (copyBtn) {
+        copyBtn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(licenseCode);
+            copyBtn.textContent = "Copied!";
+            setTimeout(() => { copyBtn.textContent = "Copy"; }, 2000);
+          } catch {}
+        });
+      }
+    }
+
+    api.trackEvent("page_view", "account").catch(() => {});
   </script>
 </body>
 </html>
