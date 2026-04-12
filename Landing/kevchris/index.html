@@ -148,7 +148,8 @@
             <th>Plan</th>
             <th>Status</th>
             <th>Credits</th>
-            <th>Gemini Tokens</th>
+            <th>License</th>
+            <th>Devices</th>
             <th>Cost</th>
             <th>Actions</th>
           </tr>
@@ -316,7 +317,7 @@
 
       const tbody = document.getElementById("usersTableBody");
       if (!r.body.users || r.body.users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:24px;">No users found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:24px;">No users found</td></tr>';
         return;
       }
 
@@ -327,12 +328,13 @@
         const pct = Math.min(100, (creditsUsed / creditsMax) * 100);
         const planColor = { trial: "#3b82f6", starter: "#ca8a04", ultra: "#a855f7" }[plan] || "#999";
 
-        // Token + cost from sessions (aggregated in matview)
-        const totalTokens = (u.total_audio_input_tokens || 0) + (u.total_audio_output_tokens || 0);
         const totalCost = parseFloat(u.total_estimated_cost_usd || "0").toFixed(2);
 
         const statusClass = u.is_blocked ? "blocked" : u.is_paused ? "paused" : u.subscription_status === "active" ? "active" : u.subscription_status === "trialing" ? "trialing" : "canceled";
         const statusLabel = u.is_blocked ? "Blocked" : u.is_paused ? "Paused" : u.subscription_status || "none";
+
+        const licenseCode = u.license_code || "";
+        const deviceNames = (u.device_names || []).filter(n => n !== "Unknown device");
 
         return `<tr>
           <td><a href="#" onclick="window._openDrawer('${u.user_id}');return false;" style="color:#3b82f6;text-decoration:none;">${esc(u.email)}</a></td>
@@ -342,9 +344,14 @@
             <div class="credits-bar"><div class="credits-fill" style="width:${pct}%;background:${planColor};"></div></div>
             <div style="font-size:10px;color:#999;">${creditsUsed.toLocaleString()}/${creditsMax.toLocaleString()}</div>
           </td>
-          <td style="font-size:12px;">${totalTokens.toLocaleString()}</td>
+          <td style="text-align:center;">
+            ${licenseCode ? `<button class="action-btn" onclick="navigator.clipboard.writeText('${esc(licenseCode)}');this.textContent='Copied!';setTimeout(()=>this.innerHTML='&#128203;',1500)" title="${esc(licenseCode)}" style="font-size:14px;border:none;padding:2px 6px;">&#128203;</button>` : '<span style="color:#ccc;">-</span>'}
+          </td>
+          <td style="font-size:11px;color:#555;max-width:120px;">
+            ${deviceNames.length > 0 ? deviceNames.map(n => esc(n)).join('<br/>') : '<span style="color:#ccc;">-</span>'}
+          </td>
           <td style="font-size:12px;">$${totalCost}</td>
-          <td>
+          <td style="white-space:nowrap;">
             ${!u.is_paused && !u.is_blocked ? `<button class="action-btn warn" onclick="window._pauseUser('${u.user_id}')">Pause</button>` : ""}
             ${u.is_paused ? `<button class="action-btn" onclick="window._unpauseUser('${u.user_id}')">Unpause</button>` : ""}
             ${!u.is_blocked ? `<button class="action-btn danger" onclick="window._blockUser('${u.user_id}')">Block</button>` : `<button class="action-btn" onclick="window._unblockUser('${u.user_id}')">Unblock</button>`}

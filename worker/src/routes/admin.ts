@@ -149,14 +149,35 @@ export async function handleAdminUsers(request: Request, env: Env): Promise<Resp
 
   const url = new URL(request.url);
   const supabase = new SupabaseClient(env);
-  const users = await supabase.searchUsersForAdmin({
+  const rawUsers = await supabase.searchUsersForAdmin({
     searchTerm: url.searchParams.get("search") ?? undefined,
     plan: url.searchParams.get("plan") ?? undefined,
     limit: parseInt(url.searchParams.get("limit") ?? "100", 10),
     offset: parseInt(url.searchParams.get("offset") ?? "0", 10),
-  });
+  }) as Array<Record<string, unknown>>;
 
-  return jsonResponse({ users });
+  // Enrich each user with license code, device names, and paused status
+  const enrichedUsers = await Promise.all(
+    rawUsers.map(async (u) => {
+      const userId = u.id as string;
+      const [licenses, devices, userRecord] = await Promise.all([
+        supabase.findLicensesByUserId(userId),
+        supabase.findDevicesForUser(userId),
+        supabase.findUserById(userId),
+      ]);
+      const activeLicense = licenses.find((l) => l.revoked_at === null);
+      return {
+        ...u,
+        user_id: userId,
+        license_code: activeLicense?.code ?? null,
+        device_names: devices.map((d) => d.device_name || "Unknown device"),
+        is_paused: userRecord?.is_paused ?? false,
+        is_blocked: userRecord?.is_blocked ?? false,
+      };
+    }),
+  );
+
+  return jsonResponse({ users: enrichedUsers });
 }
 
 export async function handleAdminUserDetail(request: Request, env: Env, userId: string): Promise<Response> {
@@ -190,12 +211,17 @@ export async function handleAdminBlockUser(request: Request, env: Env): Promise<
 
   const supabase = new SupabaseClient(env);
   await supabase.blockUser(body.user_id, body.reason ?? "blocked by admin");
+  const blockedUser = await supabase.findUserById(body.user_id);
+  if (blockedUser) {
+    await sendAccountStatusEmail(env.RESEND_API_KEY, blockedUser.email, "blocked", body.reason ?? "blocked by admin");
+  }
   await supabase.logAdminAction({
     admin_email: admin.admin_email,
     action: "block_user",
     target_user_id: body.user_id,
     reason: body.reason,
   });
+  await supabase.refreshAdminStats();
   return jsonResponse({ blocked: true });
 }
 

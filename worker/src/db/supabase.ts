@@ -465,8 +465,16 @@ export class SupabaseClient {
     await this.request(`/devices?user_id=eq.${userId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
     await this.request(`/license_codes?user_id=eq.${userId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
     await this.request(`/subscriptions?user_id=eq.${userId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
-    await this.request(`/otps?email=eq.${encodeURIComponent((await this.findUserById(userId))?.email ?? "")}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    // Also delete audit log references and OTPs
+    const user = await this.findUserById(userId);
+    if (user) {
+      await this.request(`/otps?email=eq.${encodeURIComponent(user.email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    }
+    await this.request(`/admin_audit_log?target_user_id=eq.${userId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    await this.request(`/landing_events?user_id=eq.${userId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
     await this.request(`/users?id=eq.${userId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    // Refresh the matview so the admin list updates immediately
+    await this.refreshAdminStats();
   }
 
   async getSignupStats(): Promise<{
