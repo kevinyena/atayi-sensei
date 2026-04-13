@@ -70,56 +70,37 @@ struct CompanionPanelView: View {
                 .padding(.top, 16)
                 .padding(.horizontal, 16)
 
-            if companionManager.hasCompletedOnboarding && companionManager.allPermissionsGranted {
-                Spacer()
-                    .frame(height: 12)
+            Spacer().frame(height: 12)
 
-                languagePickerRow
+            languagePickerRow
+                .padding(.horizontal, 16)
+
+            Spacer().frame(height: 16)
+
+            // Always show permissions so user sees what's granted and what's not
+            settingsSection
+                .padding(.horizontal, 16)
+
+            Spacer().frame(height: 16)
+
+            // "Talk with Sensei" button — always visible when all permissions granted
+            if companionManager.allPermissionsGranted {
+                talkWithSenseiButton
                     .padding(.horizontal, 16)
+
+                Spacer().frame(height: 16)
             }
 
-            if !companionManager.allPermissionsGranted {
-                Spacer()
-                    .frame(height: 16)
+            // Subscription status chip — plan / credits / daily cap
+            SubscriptionStatusView(companionManager: companionManager)
+                .padding(.horizontal, 16)
 
-                settingsSection
-                    .padding(.horizontal, 16)
-            }
+            Spacer().frame(height: 12)
 
-            if !companionManager.hasCompletedOnboarding && companionManager.allPermissionsGranted {
-                Spacer()
-                    .frame(height: 16)
+            dmFarzaButton
+                .padding(.horizontal, 16)
 
-                startButton
-                    .padding(.horizontal, 16)
-            }
-
-            // Show Clicky toggle — hidden for now
-            // if companionManager.hasCompletedOnboarding && companionManager.allPermissionsGranted {
-            //     Spacer()
-            //         .frame(height: 16)
-            //
-            //     showClickyCursorToggleRow
-            //         .padding(.horizontal, 16)
-            // }
-
-            if companionManager.hasCompletedOnboarding && companionManager.allPermissionsGranted {
-                Spacer()
-                    .frame(height: 16)
-
-                // Subscription status chip — plan / credits / daily cap
-                SubscriptionStatusView(companionManager: companionManager)
-                    .padding(.horizontal, 16)
-
-                Spacer()
-                    .frame(height: 12)
-
-                dmFarzaButton
-                    .padding(.horizontal, 16)
-            }
-
-            Spacer()
-                .frame(height: 12)
+            Spacer().frame(height: 12)
 
             Divider()
                 .background(DS.Colors.borderSubtle)
@@ -129,6 +110,29 @@ struct CompanionPanelView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
         }
+    }
+
+    // MARK: - Talk with Sensei button
+
+    private var talkWithSenseiButton: some View {
+        Button(action: {
+            companionManager.triggerOnboarding()
+            companionManager.openRealtimeConversationSession()
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: "waveform")
+                    .font(.system(size: 13, weight: .medium))
+                Text("Talk with Sensei")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundColor(DS.Colors.textOnAccent)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 11)
+            .background(DS.Colors.accent)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .pointerCursor()
     }
 
     // MARK: - Header
@@ -666,7 +670,9 @@ struct CompanionPanelView: View {
             .menuIndicator(.hidden)
             .menuStyle(.borderlessButton)
             .fixedSize()
+            .foregroundColor(DS.Colors.textSecondary)
             .accentColor(DS.Colors.textSecondary)
+            .tint(DS.Colors.textSecondary)
             .pointerCursor()
         }
         .padding(.vertical, 4)

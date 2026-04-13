@@ -195,22 +195,23 @@ async function handleCheckoutCompleted(
     });
   }
 
-  // Generate a fresh license code for this paid subscription.
-  // We don't revoke the trial license code — the user keeps it for reference
-  // but the active subscription (and therefore max_devices/allowance) comes
-  // from the paid subscription row.
-  const newLicenseCode = generateLicenseCode(resolvedPlan);
-  await supabase.createLicenseCode(userId, newLicenseCode);
+  // Reuse the existing license code if the user already has one (e.g. upgrading
+  // from trial to paid). This way the user keeps the same code across plan changes
+  // and doesn't need to re-activate in the app. Only generate a new code if none exists.
+  const existingLicenses = await supabase.findLicensesByUserId(userId);
+  const activeLicense = existingLicenses.find((l) => l.revoked_at === null);
+  let licenseCode: string;
+  if (activeLicense) {
+    licenseCode = activeLicense.code;
+  } else {
+    licenseCode = generateLicenseCode(resolvedPlan);
+    await supabase.createLicenseCode(userId, licenseCode);
+  }
 
-  // Store the new license code in Stripe session metadata so the success
-  // page can retrieve it via GET /api/billing/session/:id.
-  // We can't modify the session after the fact, so instead we'll look up
-  // the latest license_code for this user_id when the success page calls.
-  // Log analytics.
   await supabase.logLandingEvent({
     event_type: "checkout_completed",
     user_id: userId,
-    metadata: { plan: resolvedPlan, subscription_id: subscriptionId, license_code: newLicenseCode },
+    metadata: { plan: resolvedPlan, subscription_id: subscriptionId, license_code: licenseCode },
   });
 }
 

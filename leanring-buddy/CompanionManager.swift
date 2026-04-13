@@ -443,11 +443,22 @@ final class CompanionManager: ObservableObject {
             .sink { [weak self] newState in
                 guard let self else { return }
                 if case .active = newState {
-                    // License just became active — show the overlay if not already visible
+                    // License just became active — show overlay and auto-start
+                    // a voice session if all permissions are granted
                     if !self.isOverlayVisible && self.isClickyCursorEnabled {
+                        self.hasCompletedOnboarding = true
                         self.overlayWindowManager.hasShownOverlayBefore = true
                         self.overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
                         self.isOverlayVisible = true
+
+                        // Auto-start voice session after a short delay
+                        if self.allPermissionsGranted {
+                            NotificationCenter.default.post(name: .clickyDismissPanel, object: nil)
+                            Task {
+                                try? await Task.sleep(nanoseconds: 500_000_000)
+                                self.openRealtimeConversationSession()
+                            }
+                        }
                     }
                 }
             }
@@ -807,7 +818,7 @@ final class CompanionManager: ObservableObject {
     /// The worker responds with a `ws_url` pointing at the Durable Object that
     /// proxies Gemini Live, plus a short-lived `session_token` used as auth.
     /// The Gemini API key NEVER reaches this app.
-    private func openRealtimeConversationSession() {
+    func openRealtimeConversationSession() {
         // Cancel any pending transient hide so the overlay stays up
         transientHideTask?.cancel()
         transientHideTask = nil
