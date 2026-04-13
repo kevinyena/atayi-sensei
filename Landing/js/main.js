@@ -311,7 +311,7 @@ async function handleEmailSignup() {
   submitBtn.textContent = "Creating account\u2026";
 
   try {
-    const response = await api.signup(email, password);
+    const response = await api.signup(email, password, selectedPlatform);
     if (response.ok) {
       authState.email = email;
       showOTPScreen();
@@ -379,7 +379,7 @@ async function handleGoogleCredentialResponse(response) {
 
   try {
     const plan = authState.selectedPlan || "trial";
-    const result = await api.googleAuth(response.credential, plan);
+    const result = await api.googleAuth(response.credential, plan, selectedPlatform);
     if (result.ok) {
       authState.email = result.body.email;
       authState.sessionToken = result.body.session_token;

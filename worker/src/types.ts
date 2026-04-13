@@ -50,6 +50,7 @@ export interface User {
   is_paused: boolean;
   paused_reason: string | null;
   paused_at: string | null;
+  platform: string | null;
   password_hash: string | null;
   auth_provider: string;
   google_id: string | null;

@@ -59,11 +59,12 @@ async function issueUserSession(userId: string, email: string, plan: string | un
 // ═══════════════════════════════════════════════════════════════════
 
 export async function handleSignup(request: Request, env: Env): Promise<Response> {
-  const body = (await request.json().catch(() => null)) as { email?: string; password?: string } | null;
+  const body = (await request.json().catch(() => null)) as { email?: string; password?: string; platform?: string } | null;
   if (!body) return errorResponse("invalid_json", "Body must be JSON", 400);
 
   const email = body.email?.trim().toLowerCase() ?? "";
   const password = body.password ?? "";
+  const platform = body.platform?.toLowerCase() ?? null;
 
   if (!isValidEmail(email)) return errorResponse("invalid_email", "Invalid email address", 400);
   if (!isStrongPassword(password)) return errorResponse("weak_password", "Password must be at least 8 characters", 400);
@@ -91,6 +92,7 @@ export async function handleSignup(request: Request, env: Env): Promise<Response
       password_hash: passwordHash,
       auth_provider: "email",
       email_verified: false,
+      platform: platform,
     } as any);
     userId = user.id;
   }
@@ -198,10 +200,11 @@ export async function handleVerifyOTP(request: Request, env: Env): Promise<Respo
 // ═══════════════════════════════════════════════════════════════════
 
 export async function handleGoogleAuth(request: Request, env: Env): Promise<Response> {
-  const body = (await request.json().catch(() => null)) as { id_token?: string; plan?: string } | null;
+  const body = (await request.json().catch(() => null)) as { id_token?: string; plan?: string; platform?: string } | null;
   if (!body?.id_token) return errorResponse("missing_token", "Google id_token is required", 400);
 
   const requestedPlan = (body.plan ?? "trial") as Plan;
+  const platform = body.platform?.toLowerCase() ?? null;
 
   // Verify the Google ID token using Google's tokeninfo endpoint
   const tokenInfoResponse = await fetch(
@@ -248,6 +251,7 @@ export async function handleGoogleAuth(request: Request, env: Env): Promise<Resp
       google_id: googleId,
       auth_provider: "google",
       email_verified: true,
+      platform: platform,
     } as any);
   }
 

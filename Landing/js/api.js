@@ -84,16 +84,16 @@ export const api = {
   },
 
   // ── Auth (email + password + OTP) ───────────────────────────────
-  async signup(email, password) {
-    return postJSON("/api/auth/signup", { email, password });
+  async signup(email, password, platform) {
+    return postJSON("/api/auth/signup", { email, password, platform });
   },
 
   async verifyOTP(email, code, plan) {
     return postJSON("/api/auth/verify-otp", { email, code, plan });
   },
 
-  async googleAuth(idToken, plan) {
-    return postJSON("/api/auth/google", { id_token: idToken, plan });
+  async googleAuth(idToken, plan, platform) {
+    return postJSON("/api/auth/google", { id_token: idToken, plan, platform });
   },
 
   async login(email, password) {
