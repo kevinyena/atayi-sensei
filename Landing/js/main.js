@@ -663,7 +663,7 @@ function showSuccessScreen() {
   const stepsHtml = isMac
     ? `<div style="text-align:left;font-size:12px;color:rgba(255,255,255,0.5);line-height:1.7;margin-bottom:14px;">
         <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:6px;">Next steps:</div>
-        <div>1. The download has started automatically. Find <strong style="color:rgba(255,255,255,0.7);">Atayi-Sensei-1.0.dmg</strong> in your Downloads folder.</div>
+        <div>1. Find <strong style="color:rgba(255,255,255,0.7);">Atayi-Sensei-1.0.dmg</strong> in your Downloads folder (auto-downloaded).</div>
         <div>2. Double-click the DMG file to open it.</div>
         <div>3. Drag the Atayi Sensei icon into the Applications folder.</div>
         <div>4. Open Atayi Sensei from Applications (right-click > Open the first time).</div>
@@ -671,7 +671,7 @@ function showSuccessScreen() {
       </div>`
     : `<div style="text-align:left;font-size:12px;color:rgba(255,255,255,0.5);line-height:1.7;margin-bottom:14px;">
         <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:6px;">Next steps:</div>
-        <div>1. The download has started automatically. Find <strong style="color:rgba(255,255,255,0.7);">Atayi.Sensei.exe</strong> in your Downloads folder.</div>
+        <div>1. Find <strong style="color:rgba(255,255,255,0.7);">Atayi.Sensei.exe</strong> in your Downloads folder (auto-downloaded).</div>
         <div>2. Double-click the installer and follow the setup wizard.</div>
         <div>3. Launch Atayi Sensei from the Start menu or Desktop.</div>
         <div>4. Paste your license code when prompted.</div>
