@@ -655,42 +655,61 @@ async function proceedAfterAuth() {
 // ──────────────────────────────────────────────────────────────
 
 function showSuccessScreen() {
-  const downloadUrl = selectedPlatform === "windows"
-    ? "https://github.com/kevinyena/atayi-sensei/releases/download/v1.0.0/Atayi.Sensei.exe"
-    : "/downloads/Atayi-Sensei-1.0.dmg";
-  const downloadLabel = selectedPlatform === "windows" ? "Download for Windows" : "Download for macOS";
+  const isMac = selectedPlatform !== "windows";
+  const downloadUrl = isMac
+    ? "/downloads/Atayi-Sensei-1.0.dmg"
+    : "https://github.com/kevinyena/atayi-sensei/releases/download/v1.0.0/Atayi.Sensei.exe";
+
+  const stepsHtml = isMac
+    ? `<div style="text-align:left;font-size:12px;color:rgba(255,255,255,0.5);line-height:1.7;margin-bottom:14px;">
+        <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:6px;">Next steps:</div>
+        <div>1. The download has started automatically. Find <strong style="color:rgba(255,255,255,0.7);">Atayi-Sensei-1.0.dmg</strong> in your Downloads folder.</div>
+        <div>2. Double-click the DMG file to open it.</div>
+        <div>3. Drag the Atayi Sensei icon into the Applications folder.</div>
+        <div>4. Open Atayi Sensei from Applications (right-click > Open the first time).</div>
+        <div>5. Paste your license code when prompted.</div>
+      </div>`
+    : `<div style="text-align:left;font-size:12px;color:rgba(255,255,255,0.5);line-height:1.7;margin-bottom:14px;">
+        <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:6px;">Next steps:</div>
+        <div>1. The download has started automatically. Find <strong style="color:rgba(255,255,255,0.7);">Atayi.Sensei.exe</strong> in your Downloads folder.</div>
+        <div>2. Double-click the installer and follow the setup wizard.</div>
+        <div>3. Launch Atayi Sensei from the Start menu or Desktop.</div>
+        <div>4. Paste your license code when prompted.</div>
+      </div>`;
 
   setModalContent(`
     <div style="text-align:center;">
       <div style="font-size:40px;margin-bottom:12px;">&#127881;</div>
       <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;">You're all set!</h2>
-      <p style="margin:0 0 24px;font-size:13px;color:rgba(255,255,255,0.6);">
-        Your account has been created. Download the app and start talking to your AI Sensei.
+      <p style="margin:0 0 20px;font-size:13px;color:rgba(255,255,255,0.6);">
+        Your account has been created. Your download is starting...
       </p>
 
-      <a href="${downloadUrl}" download style="
-        display:block;width:100%;background:#111;color:white;border:none;
-        border-radius:10px;padding:13px;font-size:14px;font-weight:600;
-        cursor:pointer;text-align:center;text-decoration:none;
-        box-sizing:border-box;margin-bottom:14px;
-      ">${downloadLabel}</a>
+      ${stepsHtml}
 
       <div style="
         background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);
         border-radius:10px;padding:14px 16px;font-size:13px;color:#93c5fd;
-        line-height:1.5;text-align:left;
+        line-height:1.5;text-align:left;margin-bottom:14px;
       ">
-        Your license code has been sent to <strong style="color:white;">${authState.email}</strong>.<br/>
+        Your license code and these instructions have been sent to <strong style="color:white;">${authState.email}</strong>.<br/>
         Check your spam folder if you don't see it within a few minutes.
       </div>
 
-      <p style="margin:16px 0 0;font-size:12px;color:rgba(255,255,255,0.4);">
-        <a href="/account.html" style="color:#60a5fa;text-decoration:none;">Manage your account</a>
+      <a href="${downloadUrl}" download style="
+        display:block;width:100%;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.1);
+        border-radius:10px;padding:11px;font-size:13px;font-weight:500;
+        cursor:pointer;text-align:center;text-decoration:none;
+        box-sizing:border-box;margin-bottom:10px;
+      ">Download again (${isMac ? "macOS" : "Windows"})</a>
+
+      <p style="margin:8px 0 0;font-size:12px;color:rgba(255,255,255,0.4);">
+        <a href="/account" style="color:#60a5fa;text-decoration:none;">Manage your account</a>
       </p>
     </div>
   `);
 
-  // Auto-trigger download after a short delay
+  // Auto-trigger download
   setTimeout(() => {
     const tempLink = document.createElement("a");
     tempLink.href = downloadUrl;
