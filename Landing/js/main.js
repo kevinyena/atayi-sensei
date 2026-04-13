@@ -148,7 +148,7 @@ function showPlanChooserScreen() {
           key: "trial",
           title: "Free trial",
           price: "7 days free",
-          subtitle: "15 min / day of talk time",
+          subtitle: "30 min of talk time total",
           features: [selectedPlatform === "windows" ? "1 PC" : "1 Mac", "Full feature access", "No credit card"],
           ctaLabel: "Start free trial",
           accent: "#3b82f6",

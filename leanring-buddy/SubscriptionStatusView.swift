@@ -162,6 +162,9 @@ struct SubscriptionStatusView: View {
 
     private var planSubtext: String {
         guard case .active(let plan, _, _, let maxDevices) = licenseManager.currentState else { return "" }
+        if plan == "trial" {
+            return "30 min total"
+        }
         if plan == "ultra" {
             return "Shared across \(maxDevices) devices"
         }
