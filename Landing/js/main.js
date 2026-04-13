@@ -1,7 +1,7 @@
 // Atayi Sensei — landing page main script.
 // Flow: Download button → Plan Chooser → Create Account (Google + email/pwd) → OTP → Stripe or Trial Success
 
-import { api } from "./api.js?v=3";
+import { api } from "./api.js?v=4";
 
 const GOOGLE_CLIENT_ID = "665011541151-pglu1e7pij41rsboli7e8pshopekf0gq.apps.googleusercontent.com";
 
@@ -168,7 +168,7 @@ function showPlanChooserScreen() {
           title: "Ultra",
           price: "$49",
           period: "/ month",
-          subtitle: "~50 hours of talk time",
+          subtitle: "~60 hours of talk time",
           features: [selectedPlatform === "windows" ? "Up to 3 PCs shared" : "Up to 3 Macs shared", "160 000 Atayi credits / month", "Priority support"],
           ctaLabel: "Choose Ultra",
           accent: "#a855f7",
