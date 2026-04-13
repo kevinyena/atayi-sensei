@@ -132,6 +132,34 @@
     <div id="statsContainer"></div>
     <div id="signupBreakdown" style="margin-bottom:24px;"></div>
 
+    <!-- Pie charts row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;" id="chartsRow">
+      <div class="stat-card" id="platformChartCard">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div class="stat-label" style="margin:0;">Downloads by Platform</div>
+          <select id="platformChartPeriod" style="font-size:11px;border:1px solid #e5e5e5;border-radius:6px;padding:3px 8px;background:#fff;color:#111;font-family:inherit;">
+            <option value="total">All</option><option value="today">Today</option><option value="last3days">3 days</option><option value="last7days">7 days</option><option value="last30days">30 days</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:24px;">
+          <canvas id="platformPie" width="140" height="140"></canvas>
+          <div id="platformLegend" style="font-size:12px;"></div>
+        </div>
+      </div>
+      <div class="stat-card" id="planChartCard">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div class="stat-label" style="margin:0;">Signups by Plan</div>
+          <select id="planChartPeriod" style="font-size:11px;border:1px solid #e5e5e5;border-radius:6px;padding:3px 8px;background:#fff;color:#111;font-family:inherit;">
+            <option value="total">All</option><option value="today">Today</option><option value="last3days">3 days</option><option value="last7days">7 days</option><option value="last30days">30 days</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:24px;">
+          <canvas id="planPie" width="140" height="140"></canvas>
+          <div id="planLegend" style="font-size:12px;"></div>
+        </div>
+      </div>
+    </div>
+
     <h2 style="font-size:16px;font-weight:700;margin-bottom:12px;">Users</h2>
     <div class="filters">
       <input type="text" id="searchInput" placeholder="Search by email..." />
@@ -279,11 +307,16 @@
       `;
     }
 
+    let cachedSignupData = null;
+
     async function loadSignupStats() {
       const r = await api.adminSignupStats(adminToken);
       if (!r.ok) return;
+      cachedSignupData = r.body;
       const { signups, downloads } = r.body;
       const plans = ["trial", "starter", "ultra"];
+      const totalDl = (downloads.total?.mac || 0) + (downloads.total?.windows || 0);
+      const todayDl = (downloads.today?.mac || 0) + (downloads.today?.windows || 0);
       document.getElementById("signupBreakdown").innerHTML = `
         <div class="stat-card">
           <div class="stat-label">Signups Breakdown</div>
@@ -299,10 +332,91 @@
               }).join("")}
             </tbody>
           </table>
-          <div class="stat-sub" style="margin-top:8px;">Downloads: ${downloads.total} total, ${downloads.today} today</div>
+          <div class="stat-sub" style="margin-top:8px;">Downloads: ${totalDl} total, ${todayDl} today</div>
         </div>
       `;
+      renderCharts();
     }
+
+    // ── Pie charts ──
+    function drawPie(canvasId, legendId, slices) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const size = 140;
+      const cx = size / 2, cy = size / 2, radius = 60;
+      ctx.clearRect(0, 0, size, size);
+
+      const total = slices.reduce((s, sl) => s + sl.value, 0);
+      if (total === 0) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fillStyle = "#e5e5e5";
+        ctx.fill();
+        document.getElementById(legendId).innerHTML = '<div style="color:#999;">No data</div>';
+        return;
+      }
+
+      let startAngle = -Math.PI / 2;
+      for (const sl of slices) {
+        const sliceAngle = (sl.value / total) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, radius, startAngle, startAngle + sliceAngle);
+        ctx.closePath();
+        ctx.fillStyle = sl.color;
+        ctx.fill();
+        startAngle += sliceAngle;
+      }
+
+      // White center for donut effect
+      ctx.beginPath();
+      ctx.arc(cx, cy, 36, 0, Math.PI * 2);
+      ctx.fillStyle = "#f9f9f9";
+      ctx.fill();
+
+      // Total in center
+      ctx.fillStyle = "#111";
+      ctx.font = "bold 18px -apple-system, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(total.toString(), cx, cy);
+
+      // Legend
+      document.getElementById(legendId).innerHTML = slices
+        .filter(sl => sl.value > 0)
+        .map(sl => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+          <div style="width:10px;height:10px;border-radius:2px;background:${sl.color};flex-shrink:0;"></div>
+          <span>${sl.label}: <strong>${sl.value}</strong> (${total > 0 ? Math.round(sl.value / total * 100) : 0}%)</span>
+        </div>`).join("");
+    }
+
+    function renderCharts() {
+      if (!cachedSignupData) return;
+      const { signups, downloads } = cachedSignupData;
+
+      const platformPeriod = document.getElementById("platformChartPeriod").value;
+      const dlData = downloads[platformPeriod] || { mac: 0, windows: 0 };
+      drawPie("platformPie", "platformLegend", [
+        { label: "Mac", value: dlData.mac || 0, color: "#111" },
+        { label: "Windows", value: dlData.windows || 0, color: "#0078D4" },
+      ]);
+
+      const planPeriod = document.getElementById("planChartPeriod").value;
+      const planData = {};
+      ["trial", "starter", "ultra"].forEach(p => {
+        const bp = signups.byPlan?.[p] || { total:0, today:0, last3days:0, last7days:0, last30days:0 };
+        planData[p] = bp[planPeriod] ?? bp.total ?? 0;
+      });
+      drawPie("planPie", "planLegend", [
+        { label: "Trial", value: planData.trial, color: "#3b82f6" },
+        { label: "Starter", value: planData.starter, color: "#eab308" },
+        { label: "Ultra", value: planData.ultra, color: "#a855f7" },
+      ]);
+    }
+
+    document.getElementById("platformChartPeriod").addEventListener("change", renderCharts);
+    document.getElementById("planChartPeriod").addEventListener("change", renderCharts);
 
     // Users
     let searchTimeout;
@@ -345,13 +459,11 @@
         const allNames = deviceNames.join(" ").toLowerCase();
         const isMac = allNames.includes("mac") || allNames.includes("imac") || allNames.includes("macbook");
         const isWin = allNames.includes("desktop") || allNames.includes("windows") || allNames.includes("pc");
-        const platformIcon = isMac ? "&#63743;" : isWin ? "&#128187;" : "";
-        const platformLabel = isMac ? "Mac" : isWin ? "Win" : "-";
 
         return `<tr>
           <td><a href="#" onclick="window._openDrawer('${u.user_id}');return false;" style="color:#3b82f6;text-decoration:none;">${esc(u.email)}</a></td>
           <td><span class="plan-badge plan-${plan}">${plan}</span></td>
-          <td style="font-size:12px;text-align:center;">${platformIcon ? `<span title="${platformLabel}">${platformIcon}</span>` : '<span style="color:#ccc;">-</span>'}</td>
+          <td style="font-size:11px;text-align:center;font-weight:500;color:#555;">${isMac ? 'Mac' : isWin ? 'Win' : '<span style="color:#ccc;">-</span>'}</td>
           <td><span class="status-dot status-${statusClass}"></span>${statusLabel}</td>
           <td>
             <div class="credits-bar"><div class="credits-fill" style="width:${pct}%;background:${planColor};"></div></div>

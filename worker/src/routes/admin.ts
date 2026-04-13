@@ -331,18 +331,41 @@ export async function handleAdminSignupStats(request: Request, env: Env): Promis
   const supabase = new SupabaseClient(env);
   const signupStats = await supabase.getSignupStats();
 
-  // Also get download events count
-  const [totalDownloads, todayDownloads] = await Promise.all([
-    fetch(`${env.SUPABASE_URL}/rest/v1/landing_events?event_type=eq.download_click&select=id`, {
-      headers: supabaseHeaders(env),
-    }).then((r) => r.json().then((rows) => (rows as unknown[]).length)),
-    fetch(
-      `${env.SUPABASE_URL}/rest/v1/landing_events?event_type=eq.download_click&created_at=gte.${todayISO()}&select=id`,
-      { headers: supabaseHeaders(env) },
-    ).then((r) => r.json().then((rows) => (rows as unknown[]).length)),
-  ]);
+  // Get all download/plan_selected events with metadata for platform breakdown
+  const allDownloadEvents = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/landing_events?event_type=in.(download_click,plan_selected)&select=metadata,created_at`,
+    { headers: supabaseHeaders(env) },
+  ).then((r) => r.json()) as Array<{ metadata: { platform?: string } | null; created_at: string }>;
 
-  return jsonResponse({ signups: signupStats, downloads: { total: totalDownloads, today: todayDownloads } });
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  function countByPlatformAndTime(events: typeof allDownloadEvents) {
+    const result = {
+      total: { mac: 0, windows: 0 },
+      today: { mac: 0, windows: 0 },
+      last3days: { mac: 0, windows: 0 },
+      last7days: { mac: 0, windows: 0 },
+      last30days: { mac: 0, windows: 0 },
+    };
+    for (const e of events) {
+      const platform = (e.metadata?.platform ?? "").toLowerCase();
+      const key = platform === "windows" ? "windows" : "mac";
+      result.total[key]++;
+      if (e.created_at >= todayStart) result.today[key]++;
+      if (e.created_at >= threeDaysAgo) result.last3days[key]++;
+      if (e.created_at >= sevenDaysAgo) result.last7days[key]++;
+      if (e.created_at >= thirtyDaysAgo) result.last30days[key]++;
+    }
+    return result;
+  }
+
+  const downloads = countByPlatformAndTime(allDownloadEvents);
+
+  return jsonResponse({ signups: signupStats, downloads });
 }
 
 // ========== Pause / unpause user ==========
