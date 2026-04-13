@@ -10,6 +10,7 @@ import { generateLicenseCode } from "../lib/license-code";
 import { errorResponse, jsonResponse } from "../lib/response";
 import {
   STRIPE_PRICE_IDS,
+  createBillingPortalSession,
   createCheckoutSession,
   createCustomer,
   planFromPriceId,
@@ -330,4 +331,33 @@ export async function handleCheckoutSessionRetrieve(
     monthly_allowance: limits.monthly_credit_allowance,
     current_period_end: subscription?.current_period_end,
   });
+}
+
+/**
+ * POST /api/billing/portal
+ *
+ * Creates a Stripe Customer Portal session so the user can manage their
+ * payment method, view invoices, or cancel from Stripe's hosted UI.
+ */
+export async function handleBillingPortal(request: Request, env: Env): Promise<Response> {
+  let body: { email?: string; return_url?: string };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return errorResponse("invalid_json", "Body must be JSON", 400);
+  }
+
+  const email = body.email?.trim().toLowerCase() ?? "";
+  if (!email) return errorResponse("missing_email", "email is required", 400);
+
+  const supabase = new SupabaseClient(env);
+  const user = await supabase.findUserByEmail(email);
+  if (!user || !user.stripe_customer_id) {
+    return errorResponse("no_customer", "No Stripe customer found for this email", 404);
+  }
+
+  const returnUrl = body.return_url || "https://atayisensei.com/account";
+  const portalSession = await createBillingPortalSession(env.STRIPE_SECRET_KEY, user.stripe_customer_id, returnUrl);
+
+  return jsonResponse({ portal_url: portalSession.url });
 }

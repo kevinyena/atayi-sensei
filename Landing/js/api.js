@@ -75,6 +75,10 @@ export const api = {
     });
   },
 
+  async createBillingPortalSession(email) {
+    return postJSON("/api/billing/portal", { email, return_url: window.location.href });
+  },
+
   async retrieveCheckoutSession(stripeSessionId) {
     return getJSON(`/api/billing/session/${encodeURIComponent(stripeSessionId)}`);
   },

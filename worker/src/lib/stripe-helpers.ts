@@ -135,6 +135,17 @@ export async function retrieveSubscription(
   return (await stripeRequest(stripeSecretKey, `/subscriptions/${subscriptionId}`, "GET")) as StripeSubscription;
 }
 
+export async function createBillingPortalSession(
+  stripeSecretKey: string,
+  customerId: string,
+  returnUrl: string,
+): Promise<{ url: string }> {
+  return (await stripeRequest(stripeSecretKey, "/billing_portal/sessions", "POST", {
+    customer: customerId,
+    return_url: returnUrl,
+  })) as { url: string };
+}
+
 export async function createCustomer(
   stripeSecretKey: string,
   params: { email: string; metadata?: Record<string, string> },

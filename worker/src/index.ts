@@ -20,6 +20,7 @@ import {
 } from "./routes/auth";
 import { handleLicenseActivate, handleLicenseStatus } from "./routes/license";
 import {
+  handleBillingPortal,
   handleCheckoutCreate,
   handleCheckoutSessionRetrieve,
   handleStripeWebhook,
@@ -101,6 +102,9 @@ export default {
       // ========== Billing ==========
       if (url.pathname === "/api/billing/checkout" && method === "POST") {
         return await handleCheckoutCreate(request, env);
+      }
+      if (url.pathname === "/api/billing/portal" && method === "POST") {
+        return await handleBillingPortal(request, env);
       }
       if (url.pathname === "/api/billing/webhook" && method === "POST") {
         return await handleStripeWebhook(request, env);

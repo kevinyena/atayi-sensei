@@ -187,7 +187,7 @@
   </div>
 
   <script type="module">
-    import { api } from "/js/api.js?v=4";
+    import { api } from "/js/api.js?v=5";
 
     const GOOGLE_CLIENT_ID = "665011541151-pglu1e7pij41rsboli7e8pshopekf0gq.apps.googleusercontent.com";
 
@@ -480,7 +480,10 @@
               `}
 
               ${plan !== "trial" ? `
-                <p style="font-size:11px;color:#999;margin-top:14px;text-align:center;">
+                <p style="font-size:11px;color:#3b82f6;margin-top:14px;text-align:center;">
+                  <a href="#" id="changePaymentLink" style="color:#3b82f6;text-decoration:none;">Change payment method</a>
+                </p>
+                <p style="font-size:11px;color:#999;margin-top:6px;text-align:center;">
                   <a href="#" id="cancelSubLink" style="color:#999;text-decoration:none;">Cancel subscription</a>
                 </p>
               ` : ""}
@@ -522,6 +525,27 @@
           }
         });
       });
+
+      // Wire change payment method
+      const changePaymentLink = document.getElementById("changePaymentLink");
+      if (changePaymentLink) {
+        changePaymentLink.addEventListener("click", async (e) => {
+          e.preventDefault();
+          changePaymentLink.textContent = "Redirecting...";
+          try {
+            const portalResponse = await api.createBillingPortalSession(user.email);
+            if (portalResponse.ok && portalResponse.body.portal_url) {
+              window.location.href = portalResponse.body.portal_url;
+            } else {
+              changePaymentLink.textContent = portalResponse.body.message || "Error";
+              setTimeout(() => { changePaymentLink.textContent = "Change payment method"; }, 3000);
+            }
+          } catch (err) {
+            changePaymentLink.textContent = "Error";
+            setTimeout(() => { changePaymentLink.textContent = "Change payment method"; }, 3000);
+          }
+        });
+      }
 
       // Wire cancel subscription
       const cancelLink = document.getElementById("cancelSubLink");
