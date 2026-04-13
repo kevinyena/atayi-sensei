@@ -366,7 +366,7 @@
           </div>
           ${plan === "trial" ? `
             <div style="font-size:11px;color:#999;margin-top:6px;">
-              Today: ${dailyUsed?.toLocaleString() ?? 0} / 1,800 daily credits used
+              Today: ${dailyUsed?.toLocaleString() ?? 0} / 900 daily credits used
             </div>
           ` : ""}
         </div>
@@ -422,9 +422,27 @@
           </div>
         ` : ""}
 
-        <!-- Actions -->
-        ${plan === "trial" ? `
-          <a href="/" class="btn-primary" style="text-decoration:none;text-align:center;display:block;">Upgrade plan</a>
+        <!-- Upgrade -->
+        ${plan === "trial" || plan === "starter" ? `
+          <div class="dash-card" style="padding:0;overflow:hidden;">
+            <div style="padding:14px 18px 10px;">
+              <div class="dash-card-label" style="margin:0;">Upgrade your plan</div>
+            </div>
+            <div style="display:flex;gap:0;">
+              ${plan === "trial" ? `
+                <button class="upgrade-plan-btn" data-plan="starter" style="flex:1;padding:16px;border:none;background:#fff;cursor:pointer;border-top:1px solid #e5e5e5;border-right:1px solid #e5e5e5;text-align:left;font-family:inherit;" onmouseover="this.style.background='#fefce8'" onmouseout="this.style.background='#fff'">
+                  <div style="font-size:11px;color:#999;margin-bottom:2px;">STARTER</div>
+                  <div style="font-size:20px;font-weight:800;color:#111;">$19<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></div>
+                  <div style="font-size:11px;color:#555;margin-top:6px;line-height:1.4;">~11h talk time<br/>1 device<br/>40,000 credits</div>
+                </button>
+              ` : ""}
+              <button class="upgrade-plan-btn" data-plan="ultra" style="flex:1;padding:16px;border:none;background:#fff;cursor:pointer;border-top:1px solid #e5e5e5;text-align:left;font-family:inherit;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background='#fff'">
+                <div style="font-size:11px;color:#999;margin-bottom:2px;">ULTRA</div>
+                <div style="font-size:20px;font-weight:800;color:#111;">$49<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></div>
+                <div style="font-size:11px;color:#555;margin-top:6px;line-height:1.4;">~44h talk time<br/>3 devices<br/>160,000 credits</div>
+              </button>
+            </div>
+          </div>
         ` : ""}
         ${subscription?.cancel_at_period_end ? `
           <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;font-size:13px;color:#92400e;margin-top:12px;">
@@ -433,6 +451,7 @@
         ` : ""}
       `;
 
+      // Wire copy button
       const copyBtn = document.getElementById("copyLicenseBtn");
       if (copyBtn) {
         copyBtn.addEventListener("click", async () => {
@@ -443,6 +462,26 @@
           } catch {}
         });
       }
+
+      // Wire upgrade buttons
+      document.querySelectorAll(".upgrade-plan-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const selectedPlan = btn.getAttribute("data-plan");
+          btn.textContent = "Redirecting to Stripe...";
+          btn.disabled = true;
+          try {
+            const checkoutResponse = await api.createCheckoutSession(selectedPlan, user.email);
+            if (checkoutResponse.ok && checkoutResponse.body.checkout_url) {
+              window.location.href = checkoutResponse.body.checkout_url;
+            } else {
+              throw new Error(checkoutResponse.body.message || "Could not start checkout");
+            }
+          } catch (err) {
+            btn.textContent = err.message;
+            btn.disabled = false;
+          }
+        });
+      });
     }
 
     api.trackEvent("page_view", "account").catch(() => {});
