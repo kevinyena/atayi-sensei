@@ -328,8 +328,8 @@
 
     function renderDashboard(user, subscription, devices, licenseCode, dailyUsed, recentSessions) {
       const plan = subscription?.plan ?? "none";
-      const planColors = { trial: "#3b82f6", starter: "#eab308", ultra: "#a855f7", none: "#999" };
-      const planBgs = { trial: "#eff6ff", starter: "#fefce8", ultra: "#faf5ff", none: "#f9f9f9" };
+      const planColors = { trial: "#3b82f6", starter: "#eab308", ultra: "#a855f7", sensei: "#f97316", none: "#999" };
+      const planBgs = { trial: "#eff6ff", starter: "#fefce8", ultra: "#faf5ff", sensei: "#fff7ed", none: "#f9f9f9" };
       const planColor = planColors[plan] || "#999";
       const planBg = planBgs[plan] || "#f9f9f9";
 
@@ -419,18 +419,37 @@
           <!-- Right column: change plan -->
           <div>
             <div class="dash-card" style="position:sticky;top:24px;">
-              ${plan === "ultra" ? `
+              ${plan === "sensei" ? `
                 <div class="dash-card-label">Downgrade your plan</div>
-                <button class="upgrade-plan-btn" data-plan="starter" style="width:100%;padding:16px;border:1px solid #e5e5e5;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#ca8a04'" onmouseout="this.style.borderColor='#e5e5e5'">
+                <button class="upgrade-plan-btn" data-plan="starter" style="width:100%;padding:16px;border:1px solid #e5e5e5;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;margin-bottom:10px;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#ca8a04'" onmouseout="this.style.borderColor='#e5e5e5'">
                   <div style="display:flex;justify-content:space-between;align-items:baseline;">
                     <span style="font-size:11px;font-weight:600;color:#ca8a04;text-transform:uppercase;">Starter</span>
                     <span style="font-size:18px;font-weight:800;color:#111;">$19<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></span>
                   </div>
-                  <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;">
-                    <div>~15h of talk time</div>
-                    <div>1 device</div>
-                    <div>40,000 Atayi credits / month</div>
+                  <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;"><div>~15h of talk time</div><div>1 device</div><div>40,000 credits / month</div></div>
+                </button>
+                <button class="upgrade-plan-btn" data-plan="ultra" style="width:100%;padding:16px;border:1px solid #e5e5e5;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#a855f7'" onmouseout="this.style.borderColor='#e5e5e5'">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                    <span style="font-size:11px;font-weight:600;color:#a855f7;text-transform:uppercase;">Ultra</span>
+                    <span style="font-size:18px;font-weight:800;color:#111;">$49<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></span>
                   </div>
+                  <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;"><div>~60h of talk time</div><div>Up to 3 devices</div><div>160,000 credits / month</div></div>
+                </button>
+              ` : plan === "ultra" ? `
+                <div class="dash-card-label">Change your plan</div>
+                <button class="upgrade-plan-btn" data-plan="starter" style="width:100%;padding:16px;border:1px solid #e5e5e5;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;margin-bottom:10px;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#ca8a04'" onmouseout="this.style.borderColor='#e5e5e5'">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                    <span style="font-size:11px;font-weight:600;color:#ca8a04;text-transform:uppercase;">Starter</span>
+                    <span style="font-size:18px;font-weight:800;color:#111;">$19<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></span>
+                  </div>
+                  <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;"><div>~15h of talk time</div><div>1 device</div><div>40,000 credits / month</div></div>
+                </button>
+                <button class="upgrade-plan-btn" data-plan="sensei" style="width:100%;padding:16px;border:2px solid #f97316;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;transition:background 0.15s;" onmouseover="this.style.background='#fff7ed'" onmouseout="this.style.background='#fff'">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                    <span style="font-size:11px;font-weight:600;color:#f97316;text-transform:uppercase;">Sensei</span>
+                    <span style="font-size:18px;font-weight:800;color:#111;">$99<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></span>
+                  </div>
+                  <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;"><div>~120h of talk time</div><div>Up to 5 devices</div><div>400,000 credits / month</div></div>
                 </button>
               ` : `
                 <div class="dash-card-label">Upgrade your plan</div>
@@ -440,26 +459,23 @@
                       <span style="font-size:11px;font-weight:600;color:#ca8a04;text-transform:uppercase;">Starter</span>
                       <span style="font-size:18px;font-weight:800;color:#111;">$19<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></span>
                     </div>
-                    <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;">
-                      <div>~15h of talk time</div>
-                      <div>1 device</div>
-                      <div>40,000 Atayi credits / month</div>
-                      <div>Cancel anytime</div>
-                    </div>
+                    <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;"><div>~15h of talk time</div><div>1 device</div><div>40,000 credits / month</div><div>Cancel anytime</div></div>
                   </button>
                 ` : ""}
-                <button class="upgrade-plan-btn" data-plan="ultra" style="width:100%;padding:16px;border:2px solid #a855f7;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;transition:background 0.15s;position:relative;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background='#fff'">
+                <button class="upgrade-plan-btn" data-plan="ultra" style="width:100%;padding:16px;border:2px solid #a855f7;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;margin-bottom:10px;transition:background 0.15s;position:relative;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background='#fff'">
                   <div style="position:absolute;top:-10px;left:0;right:0;display:flex;justify-content:center;"><span style="background:#a855f7;color:white;font-size:9px;font-weight:700;padding:2px 10px;border-radius:99px;letter-spacing:0.5px;text-transform:uppercase;">Most Popular</span></div>
                   <div style="display:flex;justify-content:space-between;align-items:baseline;">
                     <span style="font-size:11px;font-weight:600;color:#a855f7;text-transform:uppercase;">Ultra</span>
                     <span style="font-size:18px;font-weight:800;color:#111;">$49<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></span>
                   </div>
-                  <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;">
-                    <div>~60h of talk time</div>
-                    <div>Up to 3 devices</div>
-                    <div>160,000 Atayi credits / month</div>
-                    <div>Priority support</div>
+                  <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;"><div>~60h of talk time</div><div>Up to 3 devices</div><div>160,000 credits / month</div><div>Priority support</div></div>
+                </button>
+                <button class="upgrade-plan-btn" data-plan="sensei" style="width:100%;padding:16px;border:2px solid #f97316;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;transition:background 0.15s;" onmouseover="this.style.background='#fff7ed'" onmouseout="this.style.background='#fff'">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                    <span style="font-size:11px;font-weight:600;color:#f97316;text-transform:uppercase;">Sensei</span>
+                    <span style="font-size:18px;font-weight:800;color:#111;">$99<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></span>
                   </div>
+                  <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;"><div>~120h of talk time</div><div>Up to 5 devices</div><div>400,000 credits / month</div><div>Priority support</div></div>
                 </button>
               `}
 

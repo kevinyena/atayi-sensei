@@ -23,9 +23,10 @@ export interface Env {
   // Hardcoded Stripe price IDs for the two plans
   STRIPE_PRICE_STARTER?: string;
   STRIPE_PRICE_ULTRA?: string;
+  STRIPE_PRICE_SENSEI?: string;
 }
 
-export type Plan = "trial" | "starter" | "ultra";
+export type Plan = "trial" | "starter" | "ultra" | "sensei";
 export type SubscriptionStatus =
   | "trialing"
   | "active"
@@ -158,6 +159,10 @@ export const PLAN_LIMITS: Record<Plan, { max_devices: number; monthly_credit_all
   ultra: {
     max_devices: 3,
     monthly_credit_allowance: 160000, // ≈44 hours of talk, shared across up to 3 Macs
+  },
+  sensei: {
+    max_devices: 5,
+    monthly_credit_allowance: 400000, // ≈120 hours of talk, shared across up to 5 devices
   },
 };
 

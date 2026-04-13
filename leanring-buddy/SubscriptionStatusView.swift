@@ -136,6 +136,7 @@ struct SubscriptionStatusView: View {
         case "trial": return "Free Trial"
         case "starter": return "Starter"
         case "ultra": return "Ultra"
+        case "sensei": return "Sensei"
         default: return plan.capitalized
         }
     }
@@ -146,6 +147,7 @@ struct SubscriptionStatusView: View {
         case "trial": return "gift.fill"
         case "starter": return "bolt.fill"
         case "ultra": return "star.fill"
+        case "sensei": return "crown.fill"
         default: return "questionmark.circle"
         }
     }
@@ -156,6 +158,7 @@ struct SubscriptionStatusView: View {
         case "trial": return DS.Colors.blue400
         case "starter": return .yellow
         case "ultra": return .purple
+        case "sensei": return .orange
         default: return DS.Colors.textTertiary
         }
     }
@@ -165,7 +168,7 @@ struct SubscriptionStatusView: View {
         if plan == "trial" {
             return "30 min total"
         }
-        if plan == "ultra" {
+        if plan == "ultra" || plan == "sensei" {
             return "Shared across \(maxDevices) devices"
         }
         return "\(maxDevices) device"

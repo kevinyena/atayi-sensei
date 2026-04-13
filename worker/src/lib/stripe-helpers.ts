@@ -199,13 +199,15 @@ export async function verifyStripeWebhookSignature(
 /**
  * Map Stripe price id → plan. Hardcoded to the two known prices.
  */
-export function planFromPriceId(priceId: string): "starter" | "ultra" | null {
+export function planFromPriceId(priceId: string): "starter" | "ultra" | "sensei" | null {
   if (priceId === "price_1TL3NTBeaBW3Kesq5lRqLLla") return "starter";
   if (priceId === "price_1TL3O8BeaBW3KesqcB5ezIL1") return "ultra";
+  if (priceId === "price_1TLoFOBeaBW3KesqancswmE5") return "sensei";
   return null;
 }
 
 export const STRIPE_PRICE_IDS = {
   starter: "price_1TL3NTBeaBW3Kesq5lRqLLla",
   ultra: "price_1TL3O8BeaBW3KesqcB5ezIL1",
+  sensei: "price_1TLoFOBeaBW3KesqancswmE5",
 } as const;

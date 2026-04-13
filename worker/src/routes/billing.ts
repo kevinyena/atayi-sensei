@@ -21,7 +21,7 @@ import type { Env, Plan } from "../types";
 import { PLAN_LIMITS } from "../types";
 
 export async function handleCheckoutCreate(request: Request, env: Env): Promise<Response> {
-  let body: { plan?: "starter" | "ultra"; email?: string; existing_license_code?: string; origin?: string };
+  let body: { plan?: "starter" | "ultra" | "sensei"; email?: string; existing_license_code?: string; origin?: string };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -29,8 +29,8 @@ export async function handleCheckoutCreate(request: Request, env: Env): Promise<
   }
 
   const plan = body.plan;
-  if (plan !== "starter" && plan !== "ultra") {
-    return errorResponse("invalid_plan", "plan must be 'starter' or 'ultra'", 400);
+  if (plan !== "starter" && plan !== "ultra" && plan !== "sensei") {
+    return errorResponse("invalid_plan", "plan must be 'starter', 'ultra', or 'sensei'", 400);
   }
   const email = body.email?.trim().toLowerCase() ?? "";
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

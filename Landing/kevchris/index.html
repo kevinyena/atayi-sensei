@@ -70,6 +70,7 @@
     .plan-trial { background:#eff6ff;color:#3b82f6; }
     .plan-starter { background:#fefce8;color:#ca8a04; }
     .plan-ultra { background:#faf5ff;color:#a855f7; }
+    .plan-sensei { background:#fff7ed;color:#f97316; }
     .status-dot { display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px; }
     .status-active { background:#22c55e; }
     .status-trialing { background:#3b82f6; }
@@ -168,6 +169,7 @@
         <option value="trial">Trial</option>
         <option value="starter">Starter</option>
         <option value="ultra">Ultra</option>
+        <option value="sensei">Sensei</option>
       </select>
       <select id="statusFilter">
         <option value="all">All statuses</option>
@@ -320,7 +322,7 @@
       if (!r.ok) return;
       cachedSignupData = r.body;
       const { signups, downloads } = r.body;
-      const plans = ["trial", "starter", "ultra"];
+      const plans = ["trial", "starter", "ultra", "sensei"];
       const totalDl = (downloads.total?.mac || 0) + (downloads.total?.windows || 0);
       const todayDl = (downloads.today?.mac || 0) + (downloads.today?.windows || 0);
       document.getElementById("signupBreakdown").innerHTML = `
@@ -410,7 +412,7 @@
 
       const planPeriod = document.getElementById("planChartPeriod").value;
       const planData = {};
-      ["trial", "starter", "ultra"].forEach(p => {
+      ["trial", "starter", "ultra", "sensei"].forEach(p => {
         const bp = signups.byPlan?.[p] || { total:0, today:0, last3days:0, last7days:0, last30days:0 };
         planData[p] = bp[planPeriod] ?? bp.total ?? 0;
       });
@@ -418,6 +420,7 @@
         { label: "Trial", value: planData.trial, color: "#3b82f6" },
         { label: "Starter", value: planData.starter, color: "#eab308" },
         { label: "Ultra", value: planData.ultra, color: "#a855f7" },
+        { label: "Sensei", value: planData.sensei, color: "#f97316" },
       ]);
     }
 
@@ -462,7 +465,7 @@
         const creditsUsed = u.credits_used_this_period || 0;
         const creditsMax = u.monthly_credit_allowance || 1;
         const pct = Math.min(100, (creditsUsed / creditsMax) * 100);
-        const planColor = { trial: "#3b82f6", starter: "#ca8a04", ultra: "#a855f7" }[plan] || "#999";
+        const planColor = { trial: "#3b82f6", starter: "#ca8a04", ultra: "#a855f7", sensei: "#f97316" }[plan] || "#999";
 
         const totalCost = parseFloat(u.total_estimated_cost_usd || "0").toFixed(2);
 

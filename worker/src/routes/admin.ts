@@ -126,7 +126,8 @@ export async function handleAdminStats(request: Request, env: Env): Promise<Resp
 
   const starterCount = activeSubscriptions.filter((s) => s.plan === "starter").length;
   const ultraCount = activeSubscriptions.filter((s) => s.plan === "ultra").length;
-  const estimatedMRR = starterCount * 19 + ultraCount * 49;
+  const senseiCount = activeSubscriptions.filter((s) => s.plan === "sensei").length;
+  const estimatedMRR = starterCount * 19 + ultraCount * 49 + senseiCount * 99;
 
   return jsonResponse({
     today_visits: todayVisits,
@@ -137,6 +138,7 @@ export async function handleAdminStats(request: Request, env: Env): Promise<Resp
       total: activeSubscriptions.length,
       starter: starterCount,
       ultra: ultraCount,
+      sensei: senseiCount,
     },
     trials_in_progress: trialsInProgress,
     estimated_mrr_usd: estimatedMRR,

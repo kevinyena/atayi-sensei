@@ -174,6 +174,16 @@ function showPlanChooserScreen() {
           accent: "#a855f7",
           isPopular: true,
         })}
+        ${renderPlanCard({
+          key: "sensei",
+          title: "Sensei",
+          price: "$99",
+          period: "/ month",
+          subtitle: "~120 hours of talk time",
+          features: [selectedPlatform === "windows" ? "Up to 5 PCs shared" : "Up to 5 Macs shared", "400 000 Atayi credits / month", "Priority support"],
+          ctaLabel: "Choose Sensei",
+          accent: "#f97316",
+        })}
       </div>
 
       <p style="margin:20px 0 0;font-size:11px;color:rgba(255,255,255,0.4);text-align:center;">
