@@ -67,7 +67,7 @@ export async function sendAccountStatusEmail(
       <h2 style="color: #111; margin-bottom: 8px;">${titles[action]}</h2>
       <p style="color: #555; font-size: 14px; line-height: 1.5;">${descriptions[action]}</p>
       ${reason ? `<p style="color: #555; font-size: 14px;"><strong>Reason:</strong> ${reason}</p>` : ""}
-      <p style="color: #999; font-size: 12px; margin-top: 24px;">If you believe this is a mistake, contact <a href="mailto:support@atayisensei.io" style="color: #3b82f6;">support@atayisensei.io</a>.</p>
+      <p style="color: #999; font-size: 12px; margin-top: 24px;">If you believe this is a mistake, contact <a href="mailto:hello@atayisensei.com" style="color: #3b82f6;">hello@atayisensei.com</a>.</p>
     </div>
   `);
 }
