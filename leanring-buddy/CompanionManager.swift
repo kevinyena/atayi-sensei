@@ -355,6 +355,7 @@ final class CompanionManager: ObservableObject {
     /// Whether the blue cursor overlay is currently visible on screen.
     /// Used by the panel to show accurate status text ("Active" vs "Ready").
     @Published private(set) var isOverlayVisible: Bool = false
+    private var cancellables = Set<AnyCancellable>()
 
 
     /// User preference for whether the Clicky cursor should be shown.
@@ -422,16 +423,35 @@ final class CompanionManager: ObservableObject {
         bindShortcutTransitions()
         bindRealtimeSessionCallbacks()
         bindBlockedEventObservation()
+        bindLicenseActivationObservation()
 
-        // Show the cursor overlay only if the user has completed onboarding,
-        // all permissions are granted, the cursor is enabled, AND a license
-        // is activated. Without an active license the overlay is hidden so the
-        // user focuses on the activation panel first.
-        if hasCompletedOnboarding && allPermissionsGranted && isClickyCursorEnabled && LicenseManager.shared.isActivated {
+        // Show the cursor overlay only if the license is already active at
+        // launch (returning user). For first-time users, the overlay appears
+        // after activation via the Combine observer below.
+        if allPermissionsGranted && isClickyCursorEnabled && LicenseManager.shared.isActivated {
             overlayWindowManager.hasShownOverlayBefore = true
             overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
             isOverlayVisible = true
         }
+    }
+
+    /// Observes LicenseManager.currentState so the overlay appears immediately
+    /// after the user activates their license code (first-time flow).
+    private func bindLicenseActivationObservation() {
+        LicenseManager.shared.$currentState
+            .receive(on: RunLoop.main)
+            .sink { [weak self] newState in
+                guard let self else { return }
+                if case .active = newState {
+                    // License just became active — show the overlay if not already visible
+                    if !self.isOverlayVisible && self.isClickyCursorEnabled {
+                        self.overlayWindowManager.hasShownOverlayBefore = true
+                        self.overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
+                        self.isOverlayVisible = true
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
 
     /// Called by BlueCursorView after the buddy finishes its pointing

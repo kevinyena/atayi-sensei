@@ -56,7 +56,7 @@ struct LicenseActivationView: View {
             .foregroundColor(DS.Colors.textPrimary)
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(DS.Colors.surface2)
+            .background(Color.white.opacity(0.12))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(DS.Colors.borderSubtle, lineWidth: 1),
@@ -160,7 +160,7 @@ struct LicenseActivationView: View {
     private func openLandingPage() {
         // Point at the public landing page — eventually this will be the custom
         // domain, for now .pages.dev.
-        if let url = URL(string: "https://atayi-sensei.pages.dev/") {
+        if let url = URL(string: "https://atayisensei.com/") {
             NSWorkspace.shared.open(url)
         }
     }

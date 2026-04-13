@@ -666,6 +666,7 @@ struct CompanionPanelView: View {
             .menuIndicator(.hidden)
             .menuStyle(.borderlessButton)
             .fixedSize()
+            .accentColor(DS.Colors.textSecondary)
             .pointerCursor()
         }
         .padding(.vertical, 4)
