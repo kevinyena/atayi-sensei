@@ -39,7 +39,7 @@
 
     /* ── Content ── */
     .page-content {
-      max-width: 520px;
+      max-width: 900px;
       margin: 0 auto;
       padding: 64px 24px 80px;
     }
@@ -126,7 +126,7 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    @media (max-width: 620px) {
+    @media (max-width: 720px) {
       nav { padding: 16px 20px; }
       .page-content { padding: 40px 20px 60px; }
     }
@@ -342,6 +342,8 @@
         ? new Date(subscription.current_period_end).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
         : "\u2014";
 
+      const showUpgrade = plan === "trial" || plan === "starter";
+
       dashboardContent.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
           <div>
@@ -351,104 +353,108 @@
           <span class="plan-badge" style="background:${planBg};color:${planColor};">${plan}</span>
         </div>
 
-        <!-- Credits -->
-        <div class="dash-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <span style="font-size:13px;color:#555;">Credits this period</span>
-            <span style="font-size:13px;font-weight:600;color:#111;">${creditsUsed.toLocaleString()} / ${creditsAllowance.toLocaleString()}</span>
-          </div>
-          <div style="height:6px;background:#e5e5e5;border-radius:99px;overflow:hidden;">
-            <div style="height:100%;width:${creditsPercent}%;background:${planColor};border-radius:99px;transition:width 0.3s;"></div>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-top:8px;">
-            <span style="font-size:11px;color:#999;">${creditsRemaining.toLocaleString()} remaining</span>
-            <span style="font-size:11px;color:#999;">Resets ${periodEnd}</span>
-          </div>
-          ${plan === "trial" ? `
-            <div style="font-size:11px;color:#999;margin-top:6px;">
-              Today: ${dailyUsed?.toLocaleString() ?? 0} / 900 daily credits used
+        <div style="display:grid;grid-template-columns:${showUpgrade ? '1fr 1fr' : '1fr'};gap:20px;align-items:start;">
+          <!-- Left column: account info -->
+          <div>
+            <!-- Credits -->
+            <div class="dash-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <span style="font-size:13px;color:#555;">Credits this period</span>
+                <span style="font-size:13px;font-weight:600;color:#111;">${creditsUsed.toLocaleString()} / ${creditsAllowance.toLocaleString()}</span>
+              </div>
+              <div style="height:6px;background:#e5e5e5;border-radius:99px;overflow:hidden;">
+                <div style="height:100%;width:${creditsPercent}%;background:${planColor};border-radius:99px;transition:width 0.3s;"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:8px;">
+                <span style="font-size:11px;color:#999;">${creditsRemaining.toLocaleString()} remaining</span>
+                <span style="font-size:11px;color:#999;">Resets ${periodEnd}</span>
+              </div>
+              ${plan === "trial" ? `<div style="font-size:11px;color:#999;margin-top:6px;">Today: ${dailyUsed?.toLocaleString() ?? 0} / 900 daily credits used</div>` : ""}
             </div>
-          ` : ""}
-        </div>
 
-        <!-- License code -->
-        ${licenseCode ? `
-          <div class="dash-card">
-            <div class="dash-card-label">License code</div>
-            <div style="
-              font-family:'SF Mono',Menlo,Consolas,monospace;font-size:14px;
-              color:#3b82f6;letter-spacing:0.5px;word-break:break-all;user-select:all;
-            ">${licenseCode}</div>
-            <button id="copyLicenseBtn" style="
-              margin-top:10px;background:none;border:1px solid #e5e5e5;
-              color:#555;border-radius:6px;padding:5px 12px;
-              font-size:12px;cursor:pointer;font-family:inherit;
-            ">Copy</button>
-          </div>
-        ` : ""}
-
-        <!-- Devices -->
-        ${devices && devices.length > 0 ? `
-          <div class="dash-card">
-            <div class="dash-card-label">Devices (${devices.length}/${subscription?.max_devices ?? "\u2014"})</div>
-            ${devices.map(d => `
-              <div class="dash-row">
-                <div>
-                  <div style="font-size:13px;color:#111;">${d.name || "Unknown device"}</div>
-                  <div style="font-size:11px;color:#999;">${d.os_version || ""}</div>
-                </div>
-                <div style="font-size:11px;color:#999;">
-                  ${d.last_active ? new Date(d.last_active).toLocaleDateString() : "Never"}
+            <!-- License code -->
+            ${licenseCode ? `
+              <div class="dash-card">
+                <div class="dash-card-label">License code</div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <span style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:14px;color:#3b82f6;letter-spacing:0.5px;word-break:break-all;user-select:all;">${licenseCode}</span>
+                  <button id="copyLicenseBtn" style="background:none;border:1px solid #e5e5e5;color:#555;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap;">Copy</button>
                 </div>
               </div>
-            `).join("")}
-          </div>
-        ` : ""}
+            ` : ""}
 
-        <!-- Recent sessions -->
-        ${recentSessions && recentSessions.length > 0 ? `
-          <div class="dash-card">
-            <div class="dash-card-label">Recent sessions</div>
-            ${recentSessions.slice(0, 5).map(s => {
-              const startDate = new Date(s.started_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-              const startTime = new Date(s.started_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-              return `
-                <div class="dash-row">
-                  <span style="font-size:12px;color:#555;">${startDate} ${startTime}</span>
-                  <span style="font-size:12px;color:#999;">${s.credits_consumed ?? 0} credits</span>
-                </div>
-              `;
-            }).join("")}
-          </div>
-        ` : ""}
+            <!-- Devices -->
+            ${devices && devices.length > 0 ? `
+              <div class="dash-card">
+                <div class="dash-card-label">Devices (${devices.length}/${subscription?.max_devices ?? "\u2014"})</div>
+                ${devices.map(d => `
+                  <div class="dash-row">
+                    <div>
+                      <div style="font-size:13px;color:#111;">${d.name || "Unknown device"}</div>
+                      <div style="font-size:11px;color:#999;">${d.os_version || ""}</div>
+                    </div>
+                    <div style="font-size:11px;color:#999;">${d.last_active ? new Date(d.last_active).toLocaleDateString() : "Never"}</div>
+                  </div>
+                `).join("")}
+              </div>
+            ` : ""}
 
-        <!-- Upgrade -->
-        ${plan === "trial" || plan === "starter" ? `
-          <div class="dash-card" style="padding:0;overflow:hidden;">
-            <div style="padding:14px 18px 10px;">
-              <div class="dash-card-label" style="margin:0;">Upgrade your plan</div>
-            </div>
-            <div style="display:flex;gap:0;">
-              ${plan === "trial" ? `
-                <button class="upgrade-plan-btn" data-plan="starter" style="flex:1;padding:16px;border:none;background:#fff;cursor:pointer;border-top:1px solid #e5e5e5;border-right:1px solid #e5e5e5;text-align:left;font-family:inherit;" onmouseover="this.style.background='#fefce8'" onmouseout="this.style.background='#fff'">
-                  <div style="font-size:11px;color:#999;margin-bottom:2px;">STARTER</div>
-                  <div style="font-size:20px;font-weight:800;color:#111;">$19<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></div>
-                  <div style="font-size:11px;color:#555;margin-top:6px;line-height:1.4;">~11h talk time<br/>1 device<br/>40,000 credits</div>
+            <!-- Recent sessions (last 3) -->
+            ${recentSessions && recentSessions.length > 0 ? `
+              <div class="dash-card">
+                <div class="dash-card-label">Recent sessions</div>
+                ${recentSessions.slice(0, 3).map(s => {
+                  const startDate = new Date(s.started_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                  const startTime = new Date(s.started_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+                  return `<div class="dash-row"><span style="font-size:12px;color:#555;">${startDate} ${startTime}</span><span style="font-size:12px;color:#999;">${s.credits_consumed ?? 0} credits</span></div>`;
+                }).join("")}
+              </div>
+            ` : ""}
+
+            ${subscription?.cancel_at_period_end ? `
+              <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;font-size:13px;color:#92400e;">
+                Your subscription will cancel at the end of the billing period (${periodEnd}).
+              </div>
+            ` : ""}
+          </div>
+
+          <!-- Right column: upgrade plans -->
+          ${showUpgrade ? `
+            <div>
+              <div class="dash-card" style="position:sticky;top:24px;">
+                <div class="dash-card-label">Upgrade your plan</div>
+
+                ${plan === "trial" ? `
+                  <button class="upgrade-plan-btn" data-plan="starter" style="width:100%;padding:16px;border:1px solid #e5e5e5;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;margin-bottom:10px;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#ca8a04'" onmouseout="this.style.borderColor='#e5e5e5'">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                      <span style="font-size:11px;font-weight:600;color:#ca8a04;text-transform:uppercase;">Starter</span>
+                      <span style="font-size:18px;font-weight:800;color:#111;">$19<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></span>
+                    </div>
+                    <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;">
+                      <div>~15h of talk time</div>
+                      <div>1 device</div>
+                      <div>40,000 Atayi credits / month</div>
+                      <div>Cancel anytime</div>
+                    </div>
+                  </button>
+                ` : ""}
+
+                <button class="upgrade-plan-btn" data-plan="ultra" style="width:100%;padding:16px;border:2px solid #a855f7;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;transition:background 0.15s;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background='#fff'">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                    <span style="font-size:11px;font-weight:600;color:#a855f7;text-transform:uppercase;">Ultra</span>
+                    <span style="font-size:18px;font-weight:800;color:#111;">$49<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></span>
+                  </div>
+                  <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;">
+                    <div>~50h of talk time</div>
+                    <div>Up to 3 devices</div>
+                    <div>160,000 Atayi credits / month</div>
+                    <div>Priority support</div>
+                  </div>
                 </button>
-              ` : ""}
-              <button class="upgrade-plan-btn" data-plan="ultra" style="flex:1;padding:16px;border:none;background:#fff;cursor:pointer;border-top:1px solid #e5e5e5;text-align:left;font-family:inherit;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background='#fff'">
-                <div style="font-size:11px;color:#999;margin-bottom:2px;">ULTRA</div>
-                <div style="font-size:20px;font-weight:800;color:#111;">$49<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></div>
-                <div style="font-size:11px;color:#555;margin-top:6px;line-height:1.4;">~44h talk time<br/>3 devices<br/>160,000 credits</div>
-              </button>
+              </div>
             </div>
-          </div>
-        ` : ""}
-        ${subscription?.cancel_at_period_end ? `
-          <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;font-size:13px;color:#92400e;margin-top:12px;">
-            Your subscription will cancel at the end of the billing period (${periodEnd}).
-          </div>
-        ` : ""}
+          ` : ""
+          }
       `;
 
       // Wire copy button
