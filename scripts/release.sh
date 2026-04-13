@@ -92,7 +92,10 @@ else
         -archivePath "${ARCHIVE_PATH}" \
         -destination "generic/platform=macOS" \
         CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
-        MARKETING_VERSION="${MARKETING_VERSION}"
+        MARKETING_VERSION="${MARKETING_VERSION}" \
+        CODE_SIGN_IDENTITY="-" \
+        CODE_SIGNING_REQUIRED=NO \
+        CODE_SIGNING_ALLOWED=NO
 fi
 
 echo "    ✅ Archive at ${ARCHIVE_PATH}"
