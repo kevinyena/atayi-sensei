@@ -169,6 +169,12 @@
         <option value="starter">Starter</option>
         <option value="ultra">Ultra</option>
       </select>
+      <select id="statusFilter">
+        <option value="all">All statuses</option>
+        <option value="active">Active</option>
+        <option value="blocked">Blocked</option>
+        <option value="paused">Paused</option>
+      </select>
     </div>
     <div style="overflow-x:auto;">
       <table class="users-table">
@@ -425,20 +431,33 @@
       searchTimeout = setTimeout(loadUsers, 300);
     });
     document.getElementById("planFilter").addEventListener("change", loadUsers);
+    document.getElementById("statusFilter").addEventListener("change", loadUsers);
 
     async function loadUsers() {
       const search = document.getElementById("searchInput").value.trim();
       const plan = document.getElementById("planFilter").value;
+      const statusFilter = document.getElementById("statusFilter").value;
       const r = await api.adminUsers(adminToken, { search, plan, limit: 200 });
       if (!r.ok) { handleAuthError(r); return; }
 
+      let users = r.body.users || [];
+
+      // Client-side status filter (blocked/paused come from enriched data)
+      if (statusFilter === "blocked") {
+        users = users.filter(u => u.is_blocked);
+      } else if (statusFilter === "paused") {
+        users = users.filter(u => u.is_paused && !u.is_blocked);
+      } else if (statusFilter === "active") {
+        users = users.filter(u => !u.is_blocked && !u.is_paused);
+      }
+
       const tbody = document.getElementById("usersTableBody");
-      if (!r.body.users || r.body.users.length === 0) {
+      if (users.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#999;padding:24px;">No users found</td></tr>';
         return;
       }
 
-      tbody.innerHTML = r.body.users.map(u => {
+      tbody.innerHTML = users.map(u => {
         const plan = u.plan || "none";
         const creditsUsed = u.credits_used_this_period || 0;
         const creditsMax = u.monthly_credit_allowance || 1;

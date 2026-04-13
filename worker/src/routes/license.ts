@@ -174,6 +174,19 @@ export async function handleLicenseStatus(request: Request, env: Env): Promise<R
   }
 
   const supabase = new SupabaseClient(env);
+
+  // Check if user still exists (may have been deleted by admin)
+  const user = await supabase.findUserById(payload.sub);
+  if (!user) {
+    return errorResponse("account_deleted", "This account no longer exists. Please create a new account at atayisensei.com.", 404);
+  }
+  if (user.is_blocked) {
+    return errorResponse("account_blocked", user.blocked_reason ?? "Account is blocked", 403);
+  }
+  if (user.is_paused) {
+    return errorResponse("account_paused", user.paused_reason ?? "Account is paused", 403);
+  }
+
   const subscription = await supabase.findLatestSubscriptionForUser(payload.sub);
   if (!subscription) {
     return errorResponse("no_subscription", "Subscription not found", 404);
