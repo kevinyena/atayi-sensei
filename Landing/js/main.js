@@ -131,7 +131,7 @@ function showPlanChooserScreen() {
     <div style="
       background:#0f1011;border:1px solid rgba(255,255,255,0.08);
       border-radius:20px;padding:32px 28px 28px;
-      max-width:720px;width:calc(100% - 32px);
+      max-width:920px;width:calc(100% - 32px);
       box-shadow:0 24px 80px rgba(0,0,0,0.6);
       font-family:system-ui,-apple-system,sans-serif;color:white;
     ">
@@ -143,7 +143,7 @@ function showPlanChooserScreen() {
         <button id="atayi-close" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:22px;cursor:pointer;padding:0;width:32px;height:32px;border-radius:8px;">&#215;</button>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
         ${renderPlanCard({
           key: "trial",
           title: "Free trial",
