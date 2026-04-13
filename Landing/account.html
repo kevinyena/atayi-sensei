@@ -342,8 +342,6 @@
         ? new Date(subscription.current_period_end).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
         : "\u2014";
 
-      const showUpgrade = plan === "trial" || plan === "starter";
-
       dashboardContent.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
           <div>
@@ -353,7 +351,7 @@
           <span class="plan-badge" style="background:${planBg};color:${planColor};">${plan}</span>
         </div>
 
-        <div style="display:grid;grid-template-columns:${showUpgrade ? '1fr 1fr' : '1fr'};gap:20px;align-items:start;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
           <!-- Left column: account info -->
           <div>
             <!-- Credits -->
@@ -418,12 +416,24 @@
             ` : ""}
           </div>
 
-          <!-- Right column: upgrade plans -->
-          ${showUpgrade ? `
-            <div>
-              <div class="dash-card" style="position:sticky;top:24px;">
+          <!-- Right column: change plan -->
+          <div>
+            <div class="dash-card" style="position:sticky;top:24px;">
+              ${plan === "ultra" ? `
+                <div class="dash-card-label">Downgrade your plan</div>
+                <button class="upgrade-plan-btn" data-plan="starter" style="width:100%;padding:16px;border:1px solid #e5e5e5;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#ca8a04'" onmouseout="this.style.borderColor='#e5e5e5'">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                    <span style="font-size:11px;font-weight:600;color:#ca8a04;text-transform:uppercase;">Starter</span>
+                    <span style="font-size:18px;font-weight:800;color:#111;">$19<span style="font-size:12px;font-weight:400;color:#999;">/mo</span></span>
+                  </div>
+                  <div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5;">
+                    <div>~15h of talk time</div>
+                    <div>1 device</div>
+                    <div>40,000 Atayi credits / month</div>
+                  </div>
+                </button>
+              ` : `
                 <div class="dash-card-label">Upgrade your plan</div>
-
                 ${plan === "trial" ? `
                   <button class="upgrade-plan-btn" data-plan="starter" style="width:100%;padding:16px;border:1px solid #e5e5e5;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;margin-bottom:10px;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#ca8a04'" onmouseout="this.style.borderColor='#e5e5e5'">
                     <div style="display:flex;justify-content:space-between;align-items:baseline;">
@@ -438,7 +448,6 @@
                     </div>
                   </button>
                 ` : ""}
-
                 <button class="upgrade-plan-btn" data-plan="ultra" style="width:100%;padding:16px;border:2px solid #a855f7;background:#fff;cursor:pointer;border-radius:10px;text-align:left;font-family:inherit;transition:background 0.15s;" onmouseover="this.style.background='#faf5ff'" onmouseout="this.style.background='#fff'">
                   <div style="display:flex;justify-content:space-between;align-items:baseline;">
                     <span style="font-size:11px;font-weight:600;color:#a855f7;text-transform:uppercase;">Ultra</span>
@@ -451,10 +460,18 @@
                     <div>Priority support</div>
                   </div>
                 </button>
-              </div>
+              `}
+
+              ${plan !== "trial" ? `
+                <p style="font-size:11px;color:#999;margin-top:14px;text-align:center;">
+                  <a href="#" id="cancelSubLink" style="color:#999;text-decoration:none;">Cancel subscription</a>
+                </p>
+              ` : ""}
+              <p style="font-size:11px;color:#ccc;margin-top:${plan === "trial" ? "14" : "6"}px;text-align:center;">
+                <a href="#" id="deleteAccountLink" style="color:#ccc;text-decoration:none;">Delete my account and data</a>
+              </p>
             </div>
-          ` : ""
-          }
+          </div>
       `;
 
       // Wire copy button
@@ -469,7 +486,7 @@
         });
       }
 
-      // Wire upgrade buttons
+      // Wire upgrade/downgrade buttons
       document.querySelectorAll(".upgrade-plan-btn").forEach(btn => {
         btn.addEventListener("click", async () => {
           const selectedPlan = btn.getAttribute("data-plan");
@@ -488,6 +505,33 @@
           }
         });
       });
+
+      // Wire cancel subscription
+      const cancelLink = document.getElementById("cancelSubLink");
+      if (cancelLink) {
+        cancelLink.addEventListener("click", async (e) => {
+          e.preventDefault();
+          if (!confirm("Are you sure you want to cancel your subscription? You will keep access until the end of your billing period.")) return;
+          cancelLink.textContent = "Cancelling...";
+          try {
+            // For now, direct to email support — Stripe portal integration can be added later
+            window.location.href = "mailto:hello@atayisensei.com?subject=Cancel my subscription&body=Please cancel my subscription. Email: " + encodeURIComponent(user.email);
+          } catch {}
+        });
+      }
+
+      // Wire delete account
+      const deleteLink = document.getElementById("deleteAccountLink");
+      if (deleteLink) {
+        deleteLink.addEventListener("click", async (e) => {
+          e.preventDefault();
+          if (!confirm("Are you sure you want to permanently delete your account and all your data? This action cannot be undone.")) return;
+          deleteLink.textContent = "Deleting...";
+          try {
+            window.location.href = "mailto:hello@atayisensei.com?subject=Delete my account&body=Please delete my account and all associated data. Email: " + encodeURIComponent(user.email);
+          } catch {}
+        });
+      }
     }
 
     api.trackEvent("page_view", "account").catch(() => {});
