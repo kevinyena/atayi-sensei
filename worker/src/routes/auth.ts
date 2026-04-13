@@ -112,6 +112,9 @@ export async function handleSignup(request: Request, env: Env): Promise<Response
     return errorResponse("email_failed", "Could not send verification email. Try again.", 500);
   }
 
+  // Refresh matview so new user appears in admin dashboard immediately
+  await supabase.refreshAdminStats();
+
   return jsonResponse({ message: "Verification code sent to your email", user_id: userId });
 }
 
@@ -182,8 +185,9 @@ export async function handleVerifyOTP(request: Request, env: Env): Promise<Respo
   // Issue session JWT
   const sessionToken = await issueUserSession(user.id, email, requestedPlan, env);
 
-  // Log event
+  // Log event + refresh admin matview so new user appears immediately
   await supabase.logLandingEvent({ event_type: "signup_completed", user_id: user.id });
+  await supabase.refreshAdminStats();
 
   return jsonResponse({
     message: "Email verified successfully",
@@ -280,6 +284,7 @@ export async function handleGoogleAuth(request: Request, env: Env): Promise<Resp
   const sessionToken = await issueUserSession(user.id, email, requestedPlan, env);
 
   await supabase.logLandingEvent({ event_type: "google_signup", user_id: user.id });
+  await supabase.refreshAdminStats();
 
   return jsonResponse({
     message: "Google sign-in successful",
