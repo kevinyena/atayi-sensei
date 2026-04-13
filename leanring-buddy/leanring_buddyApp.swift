@@ -64,6 +64,14 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
         companionManager.stop()
     }
 
+    /// Clicking the Dock icon opens the menu bar panel (same as clicking
+    /// the status bar icon). This lets users pin the app to the Dock and
+    /// launch it from there.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        menuBarPanelManager?.showPanelOnLaunch()
+        return false
+    }
+
     /// Registers the app as a login item so it launches automatically on
     /// startup. Uses SMAppService which shows the app in System Settings >
     /// General > Login Items, letting the user toggle it off if they want.
