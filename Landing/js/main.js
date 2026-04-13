@@ -679,7 +679,6 @@ function showSuccessScreen() {
 
   setModalContent(`
     <div style="text-align:center;">
-      <div style="font-size:40px;margin-bottom:12px;">&#127881;</div>
       <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;">You're all set!</h2>
       <p style="margin:0 0 20px;font-size:13px;color:rgba(255,255,255,0.6);">
         Your account has been created. Your download is starting...
