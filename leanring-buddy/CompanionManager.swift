@@ -789,17 +789,19 @@ final class CompanionManager: ObservableObject {
             // Don't interfere while the onboarding card is showing
             guard !showOnboardingCard else { return }
 
-            if geminiLiveSession.isConnected {
-                // Second press → close the conversation session
-                disconnectRealtimeConversationSession()
+            if geminiLiveSession.isConnected && !geminiLiveSession.isPaused {
+                // Session is active → pause it (mic + screenshots off, WS stays open,
+                // Gemini keeps the full conversation context)
+                geminiLiveSession.pause()
+            } else if geminiLiveSession.isConnected && geminiLiveSession.isPaused {
+                // Session is paused → resume it (mic + screenshots back on)
+                geminiLiveSession.resume()
             } else {
-                // First press → open the conversation session
+                // No session → open a new one
                 openRealtimeConversationSession()
             }
 
         case .released:
-            // Toggle model — we ignore key release. The session stays open
-            // until the user presses Ctrl+Option again to close it.
             break
 
         case .none:

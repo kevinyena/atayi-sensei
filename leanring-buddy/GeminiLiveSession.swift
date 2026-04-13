@@ -179,6 +179,7 @@ final class GeminiLiveSession: NSObject, ObservableObject {
         webSocketTask = nil
         resetPerTurnState()
         currentAudioPowerLevel = 0
+        isPaused = false
         sessionState = .disconnected
         // We deliberately do NOT reset `atayiBlockedReason` / `atayiBlockedMessage`
         // here — the CompanionManager needs to observe the value AFTER disconnect
@@ -186,9 +187,34 @@ final class GeminiLiveSession: NSObject, ObservableObject {
         // session is opened (see connect()).
     }
 
-    /// True when the session WebSocket is open.
+    /// True when the session WebSocket is open (including paused).
     var isConnected: Bool {
         sessionState != .disconnected
+    }
+
+    /// Whether mic and screenshots are temporarily stopped while the WS stays open.
+    @Published private(set) var isPaused: Bool = false
+
+    /// Pauses mic + screenshots but keeps the WebSocket alive so Gemini
+    /// retains full conversation context. Resume with resume().
+    func pause() {
+        guard isConnected && !isPaused else { return }
+        print("⏸️ Gemini Live: pausing (mic + screenshots off, WS stays open)")
+        stopMicCapture()
+        stopAndClearRollingScreenshotBuffer()
+        stopAndResetSpeakerPlayback()
+        currentAudioPowerLevel = 0
+        isPaused = true
+    }
+
+    /// Resumes mic + screenshots after a pause. The WebSocket is still open
+    /// so Gemini remembers the entire conversation.
+    func resume() {
+        guard isConnected && isPaused else { return }
+        print("▶️ Gemini Live: resuming (mic + screenshots back on)")
+        startMicCapture()
+        startRollingScreenshotTimer()
+        isPaused = false
     }
 
     /// Whether the speaker player node currently has audio playing or buffered.
