@@ -648,9 +648,9 @@ struct CompanionPanelView: View {
                 HStack(spacing: 6) {
                     Text(companionManager.selectedLanguage.flag)
                         .font(.system(size: 13))
-                    Text(companionManager.selectedLanguage.rawValue)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(DS.Colors.textPrimary)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(DS.Colors.textTertiary)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)

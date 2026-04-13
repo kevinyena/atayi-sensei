@@ -91,7 +91,7 @@ export async function handleSessionPreflight(request: Request, env: Env): Promis
   let dailyUsed = 0;
   let dailyCap: number | undefined;
   if (subscription.plan === "trial") {
-    dailyCap = PLAN_LIMITS.trial.daily_cap ?? 1800;
+    dailyCap = PLAN_LIMITS.trial.daily_cap ?? 900;
     dailyUsed = await supabase.getDailyUsageForToday(deviceToken.sub);
     if (dailyUsed >= dailyCap) {
       return errorResponse(

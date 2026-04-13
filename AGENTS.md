@@ -70,7 +70,7 @@ The worker is the only client that talks to Supabase, using the `service_role` k
 
 | Plan | Price | Credits/month | Max devices | Trial daily cap |
 |---|---|---|---|---|
-| Trial (7 days) | free | 1 800 / day soft cap | 1 | 1 800 credits (= 30 min) |
+| Trial (7 days) | free | 900 / day soft cap | 1 | 900 credits (= 15 min) |
 | Starter | $19/mo | 40 000 (~11 h) | 1 | — |
 | Ultra | $49/mo | 160 000 (~44 h, shared) | 3 | — |
 

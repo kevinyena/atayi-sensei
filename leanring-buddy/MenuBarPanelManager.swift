@@ -72,8 +72,8 @@ final class MenuBarPanelManager: NSObject {
             let aspectRatio = logoBarImage.size.width / logoBarImage.size.height
             let targetSize = NSSize(width: targetHeight * aspectRatio, height: targetHeight)
             logoBarImage.size = targetSize
-            // Not a template — keeps original colors so the image renders correctly.
-            logoBarImage.isTemplate = false
+            // Template image so macOS adapts it to light/dark menu bar automatically.
+            logoBarImage.isTemplate = true
             button.image = logoBarImage
         } else {
             button.image = makeSenseiMenuBarIcon()

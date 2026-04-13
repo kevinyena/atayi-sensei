@@ -11,6 +11,7 @@ import { extractBearerToken, signJWT, verifyJWT } from "../auth/jwt";
 import { normalizeLicenseCode } from "../lib/license-code";
 import { errorResponse, jsonResponse } from "../lib/response";
 import type { DeviceTokenPayload, Env, SubscriptionStatus } from "../types";
+import { PLAN_LIMITS } from "../types";
 
 function isSubscriptionActive(status: SubscriptionStatus): boolean {
   return status === "active" || status === "trialing" || status === "past_due";
@@ -206,7 +207,7 @@ export async function handleLicenseStatus(request: Request, env: Env): Promise<R
     credits_allowance: subscription.monthly_credit_allowance,
     credits_remaining: Math.max(0, subscription.monthly_credit_allowance - subscription.credits_used_this_period),
     daily_used: dailyCreditsConsumed,
-    daily_cap: subscription.plan === "trial" ? 1800 : null,
+    daily_cap: subscription.plan === "trial" ? (PLAN_LIMITS.trial.daily_cap ?? 900) : null,
     current_period_end: subscription.current_period_end,
     max_devices: subscription.max_devices,
   });

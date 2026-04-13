@@ -199,7 +199,7 @@ struct SubscriptionStatusView: View {
 
     private func openManage() {
         // Open the account page where the user can upgrade / change plan.
-        if let url = URL(string: "https://atayi-sensei.pages.dev/account.html") {
+        if let url = URL(string: "https://atayisensei.com/account") {
             NSWorkspace.shared.open(url)
         }
     }
