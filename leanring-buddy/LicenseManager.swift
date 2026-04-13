@@ -213,10 +213,16 @@ final class LicenseManager: ObservableObject {
                 currentState = .expired(reason: errorMessage)
             case "device_blocked", "account_blocked":
                 currentState = .blocked(reason: errorMessage)
-                // Forget the token because the server has explicitly revoked this device
                 KeychainHelper.delete(forAccount: KeychainAccount.deviceToken)
+            case "account_paused":
+                currentState = .blocked(reason: errorMessage)
+                KeychainHelper.delete(forAccount: KeychainAccount.deviceToken)
+            case "account_deleted", "no_subscription":
+                // Account was deleted by admin — clear everything so user can re-create
+                KeychainHelper.delete(forAccount: KeychainAccount.deviceToken)
+                KeychainHelper.delete(forAccount: KeychainAccount.licenseCode)
+                currentState = .notActivated
             case "unauthorized":
-                // Token expired or invalid — force re-activation
                 currentState = .notActivated
                 KeychainHelper.delete(forAccount: KeychainAccount.deviceToken)
             default:
@@ -288,6 +294,14 @@ final class LicenseManager: ObservableObject {
             case "device_blocked", "account_blocked":
                 currentState = .blocked(reason: errorMessage)
                 return .failure(.blocked(errorMessage))
+            case "account_paused":
+                currentState = .blocked(reason: errorMessage)
+                return .failure(.blocked(errorMessage))
+            case "account_deleted":
+                KeychainHelper.delete(forAccount: KeychainAccount.deviceToken)
+                KeychainHelper.delete(forAccount: KeychainAccount.licenseCode)
+                currentState = .notActivated
+                return .failure(.notActivated)
             case "unauthorized":
                 currentState = .notActivated
                 return .failure(.notActivated)
