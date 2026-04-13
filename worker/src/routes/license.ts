@@ -115,20 +115,36 @@ export async function handleLicenseActivate(request: Request, env: Env): Promise
   // New device → enforce device limit
   const activeDevices = await supabase.findActiveDevicesForUser(user.id);
   if (activeDevices.length >= subscription.max_devices) {
-    return errorResponse(
-      "device_limit_reached",
-      `This subscription allows ${subscription.max_devices} device(s). You already have ${activeDevices.length} active.`,
-      403,
-      {
-        max_devices: subscription.max_devices,
-        active_devices: activeDevices.length,
-        device_fingerprints: activeDevices.map((d) => ({
-          id: d.id,
-          name: d.device_name,
-          last_active: d.last_active_at,
-        })),
-      },
+    // Auto-clean stale devices: if a device hasn't been active in 7+ days,
+    // it's likely from a previous installation or a deleted/recreated account.
+    // Remove it so the user can re-activate on their current machine.
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const staleDevices = activeDevices.filter(
+      (d) => new Date(d.last_active_at) < sevenDaysAgo,
     );
+
+    if (staleDevices.length > 0) {
+      // Remove stale devices to make room
+      for (const staleDevice of staleDevices) {
+        await supabase.blockDevice(staleDevice.id, "auto-removed: stale device replaced by new activation");
+      }
+      // Continue to create the new device below
+    } else {
+      return errorResponse(
+        "device_limit_reached",
+        `This subscription allows ${subscription.max_devices} device(s). You already have ${activeDevices.length} active.`,
+        403,
+        {
+          max_devices: subscription.max_devices,
+          active_devices: activeDevices.length,
+          device_fingerprints: activeDevices.map((d) => ({
+            id: d.id,
+            name: d.device_name,
+            last_active: d.last_active_at,
+          })),
+        },
+      );
+    }
   }
 
   const newDevice = await supabase.createDevice({

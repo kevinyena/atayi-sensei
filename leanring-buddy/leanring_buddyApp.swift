@@ -51,12 +51,11 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
             await LicenseManager.shared.hydrateFromCache()
         }
 
-        // Auto-open the panel if the user still needs to do something:
-        // haven't onboarded, permissions revoked, or no active license.
-        let needsActivation = LicenseManager.shared.cachedDeviceToken == nil
-        if !companionManager.hasCompletedOnboarding || !companionManager.allPermissionsGranted || needsActivation {
-            menuBarPanelManager?.showPanelOnLaunch()
-        }
+        // Always auto-open the panel on launch. If the user has no license,
+        // they see the activation form immediately. If they do, they see the
+        // status + shortcut instructions. This ensures first-time users
+        // always know where to paste their license code.
+        menuBarPanelManager?.showPanelOnLaunch()
         registerAsLoginItemIfNeeded()
         // startSparkleUpdater()
     }

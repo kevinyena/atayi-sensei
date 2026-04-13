@@ -645,12 +645,12 @@ struct CompanionPanelView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Text(companionManager.selectedLanguage.flag)
                         .font(.system(size: 13))
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(DS.Colors.textTertiary)
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundColor(DS.Colors.textSecondary)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
@@ -663,6 +663,7 @@ struct CompanionPanelView: View {
                         .stroke(DS.Colors.borderSubtle, lineWidth: 0.5)
                 )
             }
+            .menuIndicator(.hidden)
             .menuStyle(.borderlessButton)
             .fixedSize()
             .pointerCursor()

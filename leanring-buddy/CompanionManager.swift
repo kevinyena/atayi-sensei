@@ -423,11 +423,11 @@ final class CompanionManager: ObservableObject {
         bindRealtimeSessionCallbacks()
         bindBlockedEventObservation()
 
-        // If the user already completed onboarding AND all permissions are
-        // still granted, show the cursor overlay immediately. If permissions
-        // were revoked (e.g. signing change), don't show the cursor — the
-        // panel will show the permissions UI instead.
-        if hasCompletedOnboarding && allPermissionsGranted && isClickyCursorEnabled {
+        // Show the cursor overlay only if the user has completed onboarding,
+        // all permissions are granted, the cursor is enabled, AND a license
+        // is activated. Without an active license the overlay is hidden so the
+        // user focuses on the activation panel first.
+        if hasCompletedOnboarding && allPermissionsGranted && isClickyCursorEnabled && LicenseManager.shared.isActivated {
             overlayWindowManager.hasShownOverlayBefore = true
             overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
             isOverlayVisible = true
