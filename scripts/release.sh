@@ -71,6 +71,8 @@ rm -rf "${ARCHIVE_PATH}"
 
 if [ "${MODE}" = "developer-id" ]; then
     # Full Developer ID signing path. Requires paid Apple Developer Program.
+    # We use CODE_SIGN_IDENTITY to sign directly with the Developer ID
+    # Application certificate, bypassing the need for a Mac Development cert.
     xcodebuild archive \
         -project "${XCODE_PROJECT}" \
         -scheme "${SCHEME}" \
@@ -79,12 +81,11 @@ if [ "${MODE}" = "developer-id" ]; then
         -destination "generic/platform=macOS" \
         CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
         MARKETING_VERSION="${MARKETING_VERSION}" \
-        CODE_SIGN_STYLE=Automatic
+        CODE_SIGN_STYLE=Manual \
+        CODE_SIGN_IDENTITY="Developer ID Application: Kevin YENA (CP2XXH3GVT)" \
+        DEVELOPMENT_TEAM="CP2XXH3GVT"
 else
-    # Unsigned-ish build: we let Xcode apply its default ad-hoc signing.
-    # The installed Apple Development cert is enough for the archive step;
-    # the resulting .app will work on the developer's own Mac and can be
-    # zipped/dmg'd for manual distribution to testers.
+    # Unsigned build for local testing / alpha distribution.
     xcodebuild archive \
         -project "${XCODE_PROJECT}" \
         -scheme "${SCHEME}" \
