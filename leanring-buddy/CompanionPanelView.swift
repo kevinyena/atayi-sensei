@@ -88,6 +88,13 @@ struct CompanionPanelView: View {
                 talkWithSenseiButton
                     .padding(.horizontal, 16)
 
+                Spacer().frame(height: 8)
+
+                Text("Tip: Press Ctrl + Option to pause Sensei when you don't need him. This saves your credits.")
+                    .font(.system(size: 10))
+                    .foregroundColor(DS.Colors.textTertiary)
+                    .padding(.horizontal, 16)
+
                 Spacer().frame(height: 16)
             }
 
