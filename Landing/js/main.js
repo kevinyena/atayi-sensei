@@ -58,7 +58,7 @@ function getOrCreateModalOverlay() {
   return overlay;
 }
 
-function setModalContent(html, maxWidth = "440px") {
+function setModalContent(html, maxWidth = "520px") {
   const overlay = getOrCreateModalOverlay();
   overlay.innerHTML = `
     <div style="
