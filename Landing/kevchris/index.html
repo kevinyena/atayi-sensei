@@ -478,9 +478,11 @@
         const deviceInfoStr = deviceNames.join(", ");
 
         // Detect platform from device names
+        // Platform from user record (set at signup), fallback to device name detection
+        const userPlatform = (u.platform || "").toLowerCase();
         const allNames = deviceNames.join(" ").toLowerCase();
-        const isMac = allNames.includes("mac") || allNames.includes("imac") || allNames.includes("macbook");
-        const isWin = allNames.includes("desktop") || allNames.includes("windows") || allNames.includes("pc");
+        const isMac = userPlatform === "mac" || (!userPlatform && (allNames.includes("mac") || allNames.includes("imac") || allNames.includes("macbook")));
+        const isWin = userPlatform === "windows" || (!userPlatform && (allNames.includes("desktop") || allNames.includes("windows") || allNames.includes("pc")));
 
         return `<tr>
           <td><a href="#" onclick="window._openDrawer('${u.user_id}');return false;" style="color:#3b82f6;text-decoration:none;">${esc(u.email)}</a></td>

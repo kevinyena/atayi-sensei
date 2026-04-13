@@ -175,6 +175,7 @@ export async function handleAdminUsers(request: Request, env: Env): Promise<Resp
         device_names: devices.map((d) => d.device_name || "Unknown device"),
         is_paused: userRecord?.is_paused ?? false,
         is_blocked: userRecord?.is_blocked ?? false,
+        platform: userRecord?.platform ?? null,
       };
     }),
   );
