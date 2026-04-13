@@ -138,7 +138,7 @@ function showPlanChooserScreen() {
       <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:22px;">
         <div>
           <h2 style="margin:0 0 6px;font-size:22px;font-weight:700;">How do you want to start?</h2>
-          <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.6);">Pick a plan or try for 7 days on us.</p>
+          <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.6);">Pick a plan or try 30 min for free.</p>
         </div>
         <button id="atayi-close" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:22px;cursor:pointer;padding:0;width:32px;height:32px;border-radius:8px;">&#215;</button>
       </div>
@@ -147,8 +147,8 @@ function showPlanChooserScreen() {
         ${renderPlanCard({
           key: "trial",
           title: "Free trial",
-          price: "7 days free",
-          subtitle: "30 min of talk time total",
+          price: "Free",
+          subtitle: "30 min of talk time",
           features: [selectedPlatform === "windows" ? "1 PC" : "1 Mac", "Full feature access", "No credit card"],
           ctaLabel: "Start free trial",
           accent: "#3b82f6",
@@ -172,7 +172,6 @@ function showPlanChooserScreen() {
           features: [selectedPlatform === "windows" ? "Up to 3 PCs shared" : "Up to 3 Macs shared", "160 000 Atayi credits / month", "Priority support"],
           ctaLabel: "Choose Ultra",
           accent: "#a855f7",
-          isPopular: true,
         })}
         ${renderPlanCard({
           key: "sensei",
@@ -183,6 +182,7 @@ function showPlanChooserScreen() {
           features: [selectedPlatform === "windows" ? "Up to 5 PCs shared" : "Up to 5 Macs shared", "400 000 Atayi credits / month", "Priority support"],
           ctaLabel: "Choose Sensei",
           accent: "#f97316",
+          isPopular: true,
         })}
       </div>
 
