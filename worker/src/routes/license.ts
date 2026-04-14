@@ -223,7 +223,7 @@ export async function handleLicenseStatus(request: Request, env: Env): Promise<R
     credits_allowance: subscription.monthly_credit_allowance,
     credits_remaining: Math.max(0, subscription.monthly_credit_allowance - subscription.credits_used_this_period),
     daily_used: dailyCreditsConsumed,
-    daily_cap: subscription.plan === "trial" ? (PLAN_LIMITS.trial.daily_cap ?? 900) : null,
+    daily_cap: PLAN_LIMITS[subscription.plan]?.daily_cap ?? null,
     current_period_end: subscription.current_period_end,
     max_devices: subscription.max_devices,
   });

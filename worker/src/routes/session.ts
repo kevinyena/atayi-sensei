@@ -87,16 +87,15 @@ export async function handleSessionPreflight(request: Request, env: Env): Promis
     );
   }
 
-  // Daily cap (trial only)
+  // Daily cap check (only for plans that define one — trial no longer has one)
   let dailyUsed = 0;
-  let dailyCap: number | undefined;
-  if (subscription.plan === "trial") {
-    dailyCap = PLAN_LIMITS.trial.daily_cap ?? 900;
+  let dailyCap: number | undefined = PLAN_LIMITS[subscription.plan]?.daily_cap;
+  if (dailyCap !== undefined) {
     dailyUsed = await supabase.getDailyUsageForToday(deviceToken.sub);
     if (dailyUsed >= dailyCap) {
       return errorResponse(
         "daily_cap_reached",
-        `Daily trial cap of ${dailyCap / 60} minutes reached. Come back tomorrow or upgrade.`,
+        `Daily cap of ${dailyCap / 60} minutes reached. Come back tomorrow or upgrade.`,
         403,
         { daily_used: dailyUsed, daily_cap: dailyCap },
       );
